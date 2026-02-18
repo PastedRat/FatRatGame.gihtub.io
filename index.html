@@ -125,11 +125,11 @@
 
     .rat {
       position: absolute;
-      width: 46px;
-      height: 36px;
-      border-radius: 60% 50% 50% 60%;
-      background: #b6b2c4;
-      box-shadow: inset -8px -6px rgba(0,0,0,0.25);
+      width: 56px;
+      height: 42px;
+      border-radius: 58% 42% 52% 48%;
+      background: radial-gradient(circle at 35% 30%, #d7cedf, #9688aa 70%);
+      box-shadow: inset -10px -8px rgba(0,0,0,0.26), 0 6px 10px rgba(0, 0, 0, 0.35);
       transform-origin: center;
       transition: transform 0.08s linear;
     }
@@ -138,24 +138,58 @@
     .rat::after {
       content: "";
       position: absolute;
-      width: 12px;
-      height: 12px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
-      background: #d6cad7;
-      top: -4px;
+      background: #d9c9d8;
+      top: -6px;
+      border: 2px solid rgba(60, 28, 50, 0.35);
     }
 
-    .rat::before { left: 5px; }
-    .rat::after { right: 5px; }
+    .rat::before { left: 7px; }
+    .rat::after { right: 7px; }
 
     .rat .eye {
       position: absolute;
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: #131313;
-      top: 11px;
-      right: 10px;
+      top: 13px;
+      right: 12px;
+      box-shadow: -14px 2px 0 #131313;
+    }
+
+    .rat .nose {
+      position: absolute;
+      width: 9px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ff95b2;
+      right: -2px;
+      top: 18px;
+    }
+
+    .rat .belly {
+      position: absolute;
+      width: 30px;
+      height: 20px;
+      border-radius: 50%;
+      left: 12px;
+      bottom: 4px;
+      background: rgba(245, 211, 228, 0.65);
+    }
+
+    .rat .tail {
+      position: absolute;
+      width: 34px;
+      height: 8px;
+      border-radius: 8px;
+      left: -26px;
+      top: 22px;
+      background: linear-gradient(90deg, #9d7899, #c58daf);
+      transform: rotate(-8deg);
+      transform-origin: right center;
     }
 
     .food {
@@ -211,7 +245,7 @@
     </aside>
 
     <section id="gameArea" aria-label="Fat Rat Game Arena">
-      <div id="rat" class="rat"><span class="eye"></span></div>
+      <div id="rat" class="rat"><span class="tail"></span><span class="belly"></span><span class="eye"></span><span class="nose"></span></div>
     </section>
   </main>
 
@@ -237,7 +271,7 @@
       spawnBoost: 0,
       zoneIndex: 0,
       keys: {},
-      rat: { x: 220, y: 180, w: 46, h: 36 },
+      rat: { x: 220, y: 180, w: 56, h: 42 },
       foods: [],
       lastSpawn: 0,
       highestUnlockedZone: 0,
@@ -282,18 +316,12 @@
         const card = document.createElement("div");
         card.className = "shop-item";
         const canBuy = state.coins >= item.cost;
-        card.innerHTML = `<strong>${item.name}</strong><div>${item.desc}</div><div>Cost: ${item.cost} coins</div>`;
-        const btn = document.createElement("button");
-        btn.textContent = canBuy ? "Buy" : "Need more coins";
-        btn.disabled = !canBuy;
-        btn.addEventListener("click", () => {
-          if (state.coins < item.cost) return;
-          state.coins -= item.cost;
-          item.apply(state);
-          setStatus(`Bought ${item.name}!`, "#81f6a4");
-          state.uiDirty = true;
-        });
-        card.appendChild(btn);
+        card.innerHTML = `
+          <strong>${item.name}</strong>
+          <div>${item.desc}</div>
+          <div>Cost: ${item.cost} coins</div>
+          <button data-action="buy" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "Buy" : "Need more coins"}</button>
+        `;
         shopWrap.appendChild(card);
       });
     }
@@ -306,21 +334,36 @@
         card.className = `zone ${open ? "" : "locked"} ${idx === state.zoneIndex ? "active" : ""}`;
 
         const btnText = idx === state.zoneIndex ? "Current Zone" : open ? "Travel" : `Unlocks at ${zone.unlockAt}`;
-        card.innerHTML = `<strong>${zone.name}</strong><div>Food bonus: +${zone.foodFat - 1} fat</div>`;
-        const btn = document.createElement("button");
-        btn.textContent = btnText;
-        btn.disabled = !open || idx === state.zoneIndex;
-        btn.style.marginTop = "6px";
-        btn.addEventListener("click", () => {
-          if (!open) return;
-          state.zoneIndex = idx;
-          setStatus(`Welcome to ${zone.name}!`, "#81f6a4");
-          state.uiDirty = true;
-        });
+        card.innerHTML = `
+          <strong>${zone.name}</strong>
+          <div>Food bonus: +${zone.foodFat - 1} fat</div>
+          <button data-action="travel" data-zone-index="${idx}" style="margin-top:6px" ${(!open || idx === state.zoneIndex) ? "disabled" : ""}>${btnText}</button>
+        `;
 
-        card.appendChild(btn);
         zonesWrap.appendChild(card);
       });
+    }
+
+    function buyItem(itemId) {
+      const item = shopItems.find(i => i.id === itemId);
+      if (!item) return;
+      if (state.coins < item.cost) return;
+      state.coins -= item.cost;
+      item.apply(state);
+      setStatus(`Bought ${item.name}!`, "#81f6a4");
+      state.uiDirty = true;
+    }
+
+    function travelToZone(index) {
+      const idx = Number(index);
+      if (Number.isNaN(idx)) return;
+      const zone = zones[idx];
+      if (!zone) return;
+      const open = state.totalFatEarned >= zone.unlockAt;
+      if (!open || idx === state.zoneIndex) return;
+      state.zoneIndex = idx;
+      setStatus(`Welcome to ${zone.name}!`, "#81f6a4");
+      state.uiDirty = true;
     }
 
     function spawnFood() {
@@ -400,7 +443,8 @@
 
       if (newestUnlock > state.highestUnlockedZone) {
         state.highestUnlockedZone = newestUnlock;
-        setStatus(`${zones[newestUnlock].name} unlocked!`, "#81f6a4");
+        state.zoneIndex = newestUnlock;
+        setStatus(`${zones[newestUnlock].name} unlocked! Auto-traveled.`, "#81f6a4");
         state.uiDirty = true;
       }
     }
@@ -431,6 +475,18 @@
 
       requestAnimationFrame(gameLoop);
     }
+
+    shopWrap.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-action='buy']");
+      if (!btn) return;
+      buyItem(btn.dataset.itemId);
+    });
+
+    zonesWrap.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-action='travel']");
+      if (!btn) return;
+      travelToZone(btn.dataset.zoneIndex);
+    });
 
     window.addEventListener("keydown", e => {
       state.keys[e.key] = true;
