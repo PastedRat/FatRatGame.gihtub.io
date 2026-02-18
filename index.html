@@ -240,8 +240,9 @@
     <div class="sheet">
       <div class="row"><h2>🏆 World Leaderboard</h2><button class="ios-btn secondary" data-close="#leaderboardModal">Close</button></div>
       <div class="card">
-        <div class="row"><label>Submit Name</label><input id="leaderboardNameInput" maxlength="18" placeholder="RatKing" /></div>
-        <button class="ios-btn" id="submitScoreBtn">Submit My Score</button>
+        <div><strong>Auto-sync is ON</strong></div>
+        <div style="color: var(--muted); margin-top:6px">Your rat is added/updated automatically while you play via online API.</div>
+        <div id="myRankText" style="margin-top:8px;font-weight:700"></div>
       </div>
       <div class="card" style="margin-top:10px">
         <div id="leaderboardList"></div>
@@ -282,6 +283,11 @@
       ratPrimary: "#f5d0fe",
       ratSecondary: "#a78bfa",
       ratAccessory: "none",
+      playerId: localStorage.getItem("fatRatPlayerId") || crypto.randomUUID(),
+      remoteBoard: [],
+      leaderboardError: "",
+      lastSubmittedFat: Number(localStorage.getItem("fatRatLastSubmittedFat") || -1),
+      leaderboardSyncInFlight: false,
       uiDirty: true
     };
 
@@ -295,6 +301,8 @@
     const shopList = document.getElementById("shopList");
     const zonesList = document.getElementById("zonesList");
     const leaderboardList = document.getElementById("leaderboardList");
+    const myRankText = document.getElementById("myRankText");
+    localStorage.setItem("fatRatPlayerId", state.playerId);
 
     function currentZone() { return zones[state.zoneIndex]; }
 
@@ -359,39 +367,214 @@
       });
     }
 
-    function loadLeaderboard() {
-      const saved = JSON.parse(localStorage.getItem("fatRatLeaderboard") || "[]");
-      const npc = [
-        { name: "BurgerBeast", fat: 420 },
-        { name: "FriesPhantom", fat: 350 },
-        { name: "CheeseWhale", fat: 260 },
-        { name: "GreaseKing", fat: 200 }
-      ];
-      const merged = [...saved, ...npc]
-        .sort((a, b) => b.fat - a.fat)
-        .slice(0, 20);
-      return merged;
+    const LEADERBOARD_API_BASE = "https://geraldburke.com/apps/simple-leaderboard/";
+    const LEADERBOARD_GAME_ID = 32;
+
+    function boardStorageKey() {
+      const url = new URL(window.location.href);
+      const board = (url.searchParams.get("board") || "global").replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "global";
+      return `fatRatWorldBoard:${board}`;
     }
 
-    function renderLeaderboard() {
-      const board = loadLeaderboard();
-      leaderboardList.innerHTML = "";
-      board.forEach((entry, i) => {
-        const row = document.createElement("div");
-        row.className = "leaderboard-item";
-        row.innerHTML = `<div>${i + 1}.</div><div>${entry.name}</div><div>${entry.fat} fat</div>`;
-        leaderboardList.appendChild(row);
+    function readLocalBoard() {
+      return JSON.parse(localStorage.getItem(boardStorageKey()) || "[]");
+    }
+
+    function writeLocalBoard(entries) {
+      localStorage.setItem(boardStorageKey(), JSON.stringify(entries));
+    }
+
+    function normalizeLeaderboardPayload(payload) {
+      if (!payload) return [];
+      const rows = Array.isArray(payload)
+        ? payload
+        : payload.entries || payload.leaderboard || payload.scores || payload.data || [];
+
+      return (Array.isArray(rows) ? rows : []).map(entry => {
+        const id = String(entry.player_id || entry.playerId || entry.id || `legacy-${entry.name || entry.player || "rat"}`);
+        const name = String(entry.name || entry.player || "Rat").slice(0, 18);
+        const fat = Number(entry.score ?? entry.fat ?? entry.points ?? 0) || 0;
+        return { id, name, fat };
       });
     }
 
-    function submitScore() {
-      const nameInput = document.getElementById("leaderboardNameInput");
-      const name = (nameInput.value || state.ratName || "FatRat").trim().slice(0, 18);
-      const saved = JSON.parse(localStorage.getItem("fatRatLeaderboard") || "[]");
-      saved.push({ name, fat: state.totalFatEarned, ts: Date.now() });
-      localStorage.setItem("fatRatLeaderboard", JSON.stringify(saved));
-      renderLeaderboard();
-      setStatus("Score submitted to world leaderboard!", "#86efac");
+    function buildLeaderboardUrl(params) {
+      const search = new URLSearchParams(params);
+      return `${LEADERBOARD_API_BASE}?${search.toString()}`;
+    }
+
+    async function fetchJsonLoose(url) {
+      const response = await fetch(url, { method: "GET", mode: "cors" });
+      if (!response.ok) return null;
+      const text = await response.text();
+      if (!text) return null;
+      try {
+        return JSON.parse(text);
+      } catch (err) {
+        const trimmed = text.trim();
+        if ((trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"))) {
+          return JSON.parse(trimmed);
+        }
+        return null;
+      }
+    }
+
+    function jsonpRequest(params, timeoutMs = 6000) {
+      return new Promise((resolve, reject) => {
+        const callbackName = `fatRatJsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const script = document.createElement("script");
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error("JSONP timeout"));
+        }, timeoutMs);
+
+        function cleanup() {
+          clearTimeout(timer);
+          delete window[callbackName];
+          script.remove();
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          resolve(payload);
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("JSONP failed"));
+        };
+
+        script.src = buildLeaderboardUrl({ ...params, callback: callbackName });
+        document.head.appendChild(script);
+      });
+    }
+
+    async function fetchRemoteLeaderboard() {
+      const getVariants = [
+        { action: "get", game_id: String(LEADERBOARD_GAME_ID) },
+        { action: "get", game: String(LEADERBOARD_GAME_ID) },
+        { action: "list", game_id: String(LEADERBOARD_GAME_ID) },
+        { game_id: String(LEADERBOARD_GAME_ID) },
+        { game: String(LEADERBOARD_GAME_ID) }
+      ];
+
+      for (const params of getVariants) {
+        try {
+          const payload = await fetchJsonLoose(buildLeaderboardUrl(params));
+          const entries = normalizeLeaderboardPayload(payload);
+          if (entries.length) {
+            state.remoteBoard = entries;
+            state.leaderboardError = "";
+            return entries;
+          }
+        } catch (err) {
+          // try next payload format
+        }
+      }
+
+      for (const params of getVariants) {
+        try {
+          const payload = await jsonpRequest(params);
+          const entries = normalizeLeaderboardPayload(payload);
+          if (entries.length) {
+            state.remoteBoard = entries;
+            state.leaderboardError = "";
+            return entries;
+          }
+        } catch (err) {
+          // try next JSONP format
+        }
+      }
+
+      state.leaderboardError = "API unavailable, showing cached/local leaderboard.";
+      return [];
+    }
+
+    async function submitRemoteScore(entry) {
+      const submitVariants = [
+        { action: "add", game_id: String(LEADERBOARD_GAME_ID), player_id: entry.id, name: entry.name, score: String(entry.fat) },
+        { action: "submit", game_id: String(LEADERBOARD_GAME_ID), player_id: entry.id, name: entry.name, score: String(entry.fat) },
+        { action: "add", game: String(LEADERBOARD_GAME_ID), player: entry.name, player_id: entry.id, points: String(entry.fat) },
+        { game_id: String(LEADERBOARD_GAME_ID), player_id: entry.id, name: entry.name, score: String(entry.fat) }
+      ];
+
+      for (const params of submitVariants) {
+        const url = buildLeaderboardUrl(params);
+        try {
+          const payload = await fetchJsonLoose(url);
+          if (payload && payload.success === false) continue;
+          return true;
+        } catch (err) {
+          // fallback to beacon image for static-hosted CORS limits
+          const ping = new Image();
+          ping.src = `${url}&_=${Date.now()}`;
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    function upsertLocalScore(entry) {
+      const board = readLocalBoard();
+      const existing = board.find(x => x.id === entry.id);
+      if (existing && existing.fat >= entry.fat && existing.name === entry.name) return false;
+      const updated = board.filter(x => x.id !== entry.id);
+      updated.push(entry);
+      writeLocalBoard(updated);
+      return true;
+    }
+
+    async function syncMyScore(force = false) {
+      if (state.leaderboardSyncInFlight) return;
+      const mine = { id: state.playerId, name: state.ratName || "Chunky", fat: state.totalFatEarned };
+      const changed = upsertLocalScore(mine);
+
+      if (!force && !changed && mine.fat <= state.lastSubmittedFat) return;
+
+      state.leaderboardSyncInFlight = true;
+      const ok = await submitRemoteScore(mine);
+      if (ok) {
+        state.lastSubmittedFat = mine.fat;
+        localStorage.setItem("fatRatLastSubmittedFat", String(state.lastSubmittedFat));
+      }
+      state.leaderboardSyncInFlight = false;
+    }
+
+    function combineBoards() {
+      const npc = [
+        { id: "npc-1", name: "BurgerBeast", fat: 420 },
+        { id: "npc-2", name: "FriesPhantom", fat: 350 },
+        { id: "npc-3", name: "CheeseWhale", fat: 260 },
+        { id: "npc-4", name: "GreaseKing", fat: 200 }
+      ];
+
+      const map = new Map();
+      [...readLocalBoard(), ...state.remoteBoard, ...npc].forEach(entry => {
+        const id = entry.id || `legacy-${entry.name}`;
+        const prev = map.get(id);
+        if (!prev || (entry.fat || 0) > (prev.fat || 0)) map.set(id, { id, name: entry.name || "Rat", fat: Number(entry.fat) || 0 });
+      });
+
+      return [...map.values()].sort((a, b) => b.fat - a.fat).slice(0, 50);
+    }
+
+    function renderLeaderboard() {
+      const board = combineBoards();
+      leaderboardList.innerHTML = "";
+      let myRank = null;
+      board.forEach((entry, i) => {
+        if (entry.id === state.playerId) myRank = i + 1;
+        const row = document.createElement("div");
+        row.className = "leaderboard-item";
+        const mine = entry.id === state.playerId;
+        row.style.background = mine ? "rgba(52, 211, 153, 0.2)" : "transparent";
+        row.innerHTML = `<div>${i + 1}.</div><div>${entry.name}${mine ? " (You)" : ""}</div><div>${entry.fat} fat</div>`;
+        leaderboardList.appendChild(row);
+      });
+
+      const errorText = state.leaderboardError ? ` • ${state.leaderboardError}` : "";
+      myRankText.textContent = myRank ? `Your place: #${myRank} with ${state.totalFatEarned} fat${errorText}` : `Play to get ranked.${errorText}`;
     }
 
     function buyItem(id) {
@@ -479,7 +662,10 @@
         gained = true;
         return false;
       });
-      if (gained) state.uiDirty = true;
+      if (gained) {
+        state.uiDirty = true;
+        syncMyScore();
+      }
     }
 
     function renderAll() {
@@ -510,7 +696,12 @@
     document.getElementById("openShopBtn").addEventListener("click", () => openModal("#shopModal"));
     document.getElementById("openZonesBtn").addEventListener("click", () => openModal("#zonesModal"));
     document.getElementById("openRatBtn").addEventListener("click", () => openModal("#ratModal"));
-    document.getElementById("openLeaderboardBtn").addEventListener("click", () => openModal("#leaderboardModal"));
+    document.getElementById("openLeaderboardBtn").addEventListener("click", async () => {
+      openModal("#leaderboardModal");
+      await fetchRemoteLeaderboard();
+      await syncMyScore(true);
+      renderLeaderboard();
+    });
 
     document.querySelectorAll("[data-close]").forEach(btn => btn.addEventListener("click", () => closeModal(btn.dataset.close)));
 
@@ -532,10 +723,11 @@
       state.ratSecondary = document.getElementById("ratSecondaryInput").value;
       state.ratAccessory = document.getElementById("ratAccessoryInput").value;
       state.uiDirty = true;
+      syncMyScore(true);
+      renderLeaderboard();
       setStatus("Rat customization saved!", "#86efac");
     });
 
-    document.getElementById("submitScoreBtn").addEventListener("click", submitScore);
 
     window.addEventListener("keydown", e => {
       state.keys[e.key] = true;
@@ -550,6 +742,8 @@
     window.addEventListener("resize", clampRat);
 
     renderAll();
+    fetchRemoteLeaderboard().then(() => { renderLeaderboard(); });
+    syncMyScore(true);
     requestAnimationFrame(gameLoop);
   </script>
 </body>
