@@ -239,7 +239,9 @@
       keys: {},
       rat: { x: 220, y: 180, w: 46, h: 36 },
       foods: [],
-      lastSpawn: 0
+      lastSpawn: 0,
+      highestUnlockedZone: 0,
+      uiDirty: true
     };
 
     const gameArea = document.getElementById("gameArea");
@@ -289,7 +291,7 @@
           state.coins -= item.cost;
           item.apply(state);
           setStatus(`Bought ${item.name}!`, "#81f6a4");
-          renderAll();
+          state.uiDirty = true;
         });
         card.appendChild(btn);
         shopWrap.appendChild(card);
@@ -313,7 +315,7 @@
           if (!open) return;
           state.zoneIndex = idx;
           setStatus(`Welcome to ${zone.name}!`, "#81f6a4");
-          renderAll();
+          state.uiDirty = true;
         });
 
         card.appendChild(btn);
@@ -367,10 +369,12 @@
     function collectFood() {
       const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
 
+      let collectedAny = false;
       state.foods = state.foods.filter(food => {
         const hit = intersects(ratBox, { x: food.x, y: food.y, w: 24, h: 24 });
         if (!hit) return true;
 
+        collectedAny = true;
         state.fat += food.fatValue;
         state.totalFatEarned += food.fatValue;
         state.coins += food.coinValue;
@@ -379,16 +383,25 @@
         if (el) el.remove();
         return false;
       });
+
+      if (collectedAny) {
+        state.uiDirty = true;
+      }
     }
 
     function maybeAutoUnlockZone() {
+      let newestUnlock = 0;
       for (let i = zones.length - 1; i >= 0; i--) {
         if (state.totalFatEarned >= zones[i].unlockAt) {
-          if (state.zoneIndex < i) {
-            setStatus(`${zones[i].name} unlocked!`, "#81f6a4");
-          }
+          newestUnlock = i;
           break;
         }
+      }
+
+      if (newestUnlock > state.highestUnlockedZone) {
+        state.highestUnlockedZone = newestUnlock;
+        setStatus(`${zones[newestUnlock].name} unlocked!`, "#81f6a4");
+        state.uiDirty = true;
       }
     }
 
@@ -396,6 +409,7 @@
       renderHUD();
       renderShop();
       renderZones();
+      state.uiDirty = false;
     }
 
     function gameLoop(ts) {
@@ -408,9 +422,12 @@
       updateRat();
       collectFood();
       maybeAutoUnlockZone();
-      renderHUD();
-      renderShop();
-      renderZones();
+
+      if (state.uiDirty) {
+        renderAll();
+      } else {
+        renderHUD();
+      }
 
       requestAnimationFrame(gameLoop);
     }
