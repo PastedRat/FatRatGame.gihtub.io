@@ -3,194 +3,128 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fat Rat Feast</title>
+  <title>Fat Rat: iPhone Edition</title>
   <style>
     :root {
-      --bg: #1c1020;
-      --panel: #2d1a35;
-      --accent: #ffbf47;
-      --good: #81f6a4;
-      --text: #ffe9c4;
-      --danger: #ff7d6b;
+      --bg-top: #111827;
+      --bg-bottom: #1f2937;
+      --glass: rgba(255, 255, 255, 0.12);
+      --glass-strong: rgba(255, 255, 255, 0.2);
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #60a5fa;
+      --good: #34d399;
+      --danger: #fb7185;
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: "Trebuchet MS", system-ui, sans-serif;
-      color: var(--text);
-      background: radial-gradient(circle at top, #3c2348 0%, var(--bg) 65%);
       min-height: 100vh;
+      font-family: "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 0%, #3b82f6 0%, transparent 36%),
+        radial-gradient(circle at 80% 100%, #8b5cf6 0%, transparent 32%),
+        linear-gradient(160deg, var(--bg-top), var(--bg-bottom));
       display: grid;
       grid-template-rows: auto 1fr;
     }
 
     .top-panel {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 14px;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 18px;
-      background: rgba(0, 0, 0, 0.25);
-      border-bottom: 2px solid rgba(255, 191, 71, 0.3);
       position: sticky;
       top: 0;
-      z-index: 5;
+      z-index: 30;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      backdrop-filter: blur(12px);
+      background: rgba(15, 23, 42, 0.6);
+      border-bottom: 1px solid rgba(255,255,255,.15);
     }
 
     .stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(90px, 1fr));
+      gap: 8px;
+    }
+
+    .pill {
+      border-radius: 16px;
+      padding: 9px 10px;
+      background: linear-gradient(180deg, rgba(255,255,255,.2), rgba(255,255,255,.09));
+      border: 1px solid rgba(255,255,255,.2);
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.86rem;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+    }
+
+    .button-row {
       display: flex;
       gap: 10px;
       flex-wrap: wrap;
     }
 
-    .pill {
-      background: var(--panel);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      padding: 8px 12px;
-      font-weight: 700;
-      font-size: 0.95rem;
-    }
-
-    .layout {
-      display: grid;
-      grid-template-columns: minmax(230px, 290px) 1fr;
-      gap: 14px;
-      padding: 14px;
-    }
-
-    .panel {
-      background: rgba(17, 10, 25, 0.8);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 14px;
-      padding: 12px;
-    }
-
-    h2 {
-      margin: 0 0 10px;
-      font-size: 1.15rem;
-      letter-spacing: 0.3px;
-    }
-
-    .shop-item {
-      background: var(--panel);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 10px;
-      margin-bottom: 10px;
-      padding: 10px;
-    }
-
-    .shop-item button {
-      margin-top: 8px;
-      width: 100%;
-      cursor: pointer;
+    .ios-btn {
       border: none;
-      border-radius: 8px;
-      padding: 8px;
+      border-radius: 14px;
+      padding: 10px 14px;
+      color: white;
+      background: linear-gradient(180deg, #60a5fa, #2563eb);
       font-weight: 700;
-      color: #241320;
-      background: var(--accent);
+      box-shadow: 0 8px 16px rgba(37,99,235,.35), inset 0 1px 0 rgba(255,255,255,.35);
+      cursor: pointer;
     }
 
-    .shop-item button:disabled {
-      background: #8e798f;
+    .ios-btn.secondary {
+      background: linear-gradient(180deg, #a78bfa, #7c3aed);
+      box-shadow: 0 8px 16px rgba(124,58,237,.35), inset 0 1px 0 rgba(255,255,255,.35);
+    }
+
+    .ios-btn:disabled {
+      opacity: .5;
       cursor: not-allowed;
-    }
-
-    .zone {
-      padding: 8px;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      background: #271631;
-    }
-
-    .zone.locked { opacity: 0.5; }
-    .zone.active {
-      border-color: var(--good);
-      background: rgba(129, 246, 164, 0.15);
+      box-shadow: none;
     }
 
     #gameArea {
+      margin: 12px;
+      border-radius: 24px;
       position: relative;
-      height: min(72vh, 620px);
-      border-radius: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.14);
       overflow: hidden;
-      background: linear-gradient(160deg, rgba(255,255,255,0.04), rgba(0,0,0,0.25));
+      border: 1px solid rgba(255,255,255,.2);
+      background: linear-gradient(150deg, rgba(255,255,255,.08), rgba(0,0,0,.35));
+      min-height: 68vh;
     }
 
     .rat {
       position: absolute;
-      width: 56px;
-      height: 42px;
-      border-radius: 58% 42% 52% 48%;
-      background: radial-gradient(circle at 35% 30%, #d7cedf, #9688aa 70%);
-      box-shadow: inset -10px -8px rgba(0,0,0,0.26), 0 6px 10px rgba(0, 0, 0, 0.35);
+      width: 64px;
+      height: 48px;
+      border-radius: 54% 46% 50% 50%;
       transform-origin: center;
-      transition: transform 0.08s linear;
+      transition: transform .08s linear;
+      background: radial-gradient(circle at 30% 30%, var(--rat-primary, #f5d0fe), var(--rat-secondary, #a78bfa) 72%);
+      box-shadow: inset -10px -8px rgba(0,0,0,.2), 0 8px 12px rgba(0,0,0,.35);
     }
-
-    .rat::before,
-    .rat::after {
+    .rat::before,.rat::after {
       content: "";
       position: absolute;
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      background: #d9c9d8;
-      top: -6px;
-      border: 2px solid rgba(60, 28, 50, 0.35);
+      background: color-mix(in oklab, var(--rat-primary, #f5d0fe) 80%, white);
+      top: -5px;
+      border: 2px solid rgba(0,0,0,.2);
     }
-
-    .rat::before { left: 7px; }
-    .rat::after { right: 7px; }
-
-    .rat .eye {
-      position: absolute;
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #131313;
-      top: 13px;
-      right: 12px;
-      box-shadow: -14px 2px 0 #131313;
-    }
-
-    .rat .nose {
-      position: absolute;
-      width: 9px;
-      height: 7px;
-      border-radius: 50%;
-      background: #ff95b2;
-      right: -2px;
-      top: 18px;
-    }
-
-    .rat .belly {
-      position: absolute;
-      width: 30px;
-      height: 20px;
-      border-radius: 50%;
-      left: 12px;
-      bottom: 4px;
-      background: rgba(245, 211, 228, 0.65);
-    }
-
-    .rat .tail {
-      position: absolute;
-      width: 34px;
-      height: 8px;
-      border-radius: 8px;
-      left: -26px;
-      top: 22px;
-      background: linear-gradient(90deg, #9d7899, #c58daf);
-      transform: rotate(-8deg);
-      transform-origin: right center;
-    }
+    .rat::before { left: 8px; }
+    .rat::after { right: 8px; }
+    .rat .eye { position: absolute; width: 6px; height: 6px; border-radius: 50%; top: 15px; right: 12px; background: #111; box-shadow: -16px 1px 0 #111; }
+    .rat .nose { position: absolute; width: 9px; height: 7px; right: -2px; top: 20px; border-radius: 50%; background: #fb7185; }
+    .rat .tail { position: absolute; width: 36px; height: 8px; left: -28px; top: 26px; border-radius: 10px; transform: rotate(-10deg); background: linear-gradient(90deg, #c084fc, #f9a8d4); }
 
     .food {
       position: absolute;
@@ -199,67 +133,135 @@
       font-size: 24px;
       display: grid;
       place-items: center;
-      user-select: none;
       pointer-events: none;
     }
 
-    #statusMsg {
-      margin-top: 8px;
-      color: #ffd79b;
-      min-height: 20px;
-      font-weight: 600;
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(2,6,23,.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+      backdrop-filter: blur(8px);
     }
 
-    .help {
-      font-size: 0.9rem;
-      opacity: 0.88;
+    .modal.open { display: flex; }
+
+    .sheet {
+      width: min(760px, 100%);
+      max-height: 85vh;
+      overflow: auto;
+      border-radius: 22px;
+      padding: 16px;
+      background: linear-gradient(180deg, rgba(255,255,255,.22), rgba(255,255,255,.12));
+      border: 1px solid rgba(255,255,255,.25);
     }
 
-    @media (max-width: 880px) {
-      .layout { grid-template-columns: 1fr; }
-      #gameArea { height: 62vh; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 10px 0; }
+    .card { border-radius: 16px; padding: 12px; background: rgba(15,23,42,.45); border: 1px solid rgba(255,255,255,.15); }
+
+    input, select {
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.25);
+      background: rgba(15,23,42,.45);
+      color: white;
+      padding: 8px;
+    }
+
+    .leaderboard-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
+    .status { font-weight: 700; min-height: 22px; color: #fde68a; margin-top: 6px; }
+
+    @media (max-width: 760px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      #gameArea { min-height: 64vh; }
     }
   </style>
 </head>
 <body>
   <header class="top-panel">
     <div class="stats">
-      <div class="pill">🐀 Rat Fat: <span id="fatStat">0</span></div>
-      <div class="pill">💰 Cheese Coins: <span id="coinStat">0</span></div>
-      <div class="pill">📈 Total Fat Earned: <span id="earnedStat">0</span></div>
-      <div class="pill">🌎 Zone: <span id="zoneStat">Alley</span></div>
+      <div class="pill">🐀 Fat <span id="fatStat">0</span></div>
+      <div class="pill">🧀 Coins <span id="coinStat">0</span></div>
+      <div class="pill">📈 Earned <span id="earnedStat">0</span></div>
+      <div class="pill">🌍 <span id="zoneStat">Alley</span></div>
     </div>
-    <div class="pill">Move with <strong>WASD / Arrow Keys</strong></div>
+    <div class="button-row">
+      <button class="ios-btn" id="openShopBtn">Boosts</button>
+      <button class="ios-btn secondary" id="openZonesBtn">Zones</button>
+      <button class="ios-btn" id="openRatBtn">Customize Rat</button>
+      <button class="ios-btn secondary" id="openLeaderboardBtn">World Leaderboard</button>
+    </div>
+    <div class="pill">Move with WASD / Arrow Keys</div>
+    <div class="status" id="statusMsg"></div>
   </header>
 
-  <main class="layout">
-    <aside class="panel">
-      <h2>🛒 Rat Shop</h2>
-      <div id="shop"></div>
-
-      <h2 style="margin-top:14px">🔓 Zones</h2>
-      <div id="zones"></div>
-
-      <p class="help">Eat 🍔 and 🍟 to gain fat and coins. Each fat point makes your rat bigger. New zones unlock from total fat earned.</p>
-      <div id="statusMsg"></div>
-    </aside>
-
-    <section id="gameArea" aria-label="Fat Rat Game Arena">
-      <div id="rat" class="rat"><span class="tail"></span><span class="belly"></span><span class="eye"></span><span class="nose"></span></div>
-    </section>
+  <main id="gameArea" aria-label="Fat Rat Game Arena">
+    <div id="rat" class="rat"><span class="tail"></span><span class="eye"></span><span class="nose"></span></div>
   </main>
+
+  <div class="modal" id="shopModal">
+    <div class="sheet">
+      <div class="row"><h2>🛒 Boost Shop</h2><button class="ios-btn secondary" data-close="#shopModal">Close</button></div>
+      <div id="shopList"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="zonesModal">
+    <div class="sheet">
+      <div class="row"><h2>🔓 Zones</h2><button class="ios-btn secondary" data-close="#zonesModal">Close</button></div>
+      <div id="zonesList"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="ratModal">
+    <div class="sheet">
+      <div class="row"><h2>🎨 Customize Rat</h2><button class="ios-btn secondary" data-close="#ratModal">Close</button></div>
+      <div class="card">
+        <div class="row"><label>Rat Name</label><input id="ratNameInput" maxlength="18" placeholder="Chunky" /></div>
+        <div class="row"><label>Primary Color</label><input id="ratPrimaryInput" type="color" value="#f5d0fe" /></div>
+        <div class="row"><label>Secondary Color</label><input id="ratSecondaryInput" type="color" value="#a78bfa" /></div>
+        <div class="row"><label>Accessory</label>
+          <select id="ratAccessoryInput">
+            <option value="none">None</option>
+            <option value="crown">Crown 👑</option>
+            <option value="cap">Cap 🧢</option>
+            <option value="glasses">Glasses 🕶️</option>
+          </select>
+        </div>
+        <button class="ios-btn" id="saveRatBtn">Save Customization</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="leaderboardModal">
+    <div class="sheet">
+      <div class="row"><h2>🏆 World Leaderboard</h2><button class="ios-btn secondary" data-close="#leaderboardModal">Close</button></div>
+      <div class="card">
+        <div class="row"><label>Submit Name</label><input id="leaderboardNameInput" maxlength="18" placeholder="RatKing" /></div>
+        <button class="ios-btn" id="submitScoreBtn">Submit My Score</button>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div id="leaderboardList"></div>
+      </div>
+    </div>
+  </div>
 
   <script>
     const zones = [
-      { name: "Alley", unlockAt: 0, foodRate: 1150, foodFat: 1, bg: "linear-gradient(160deg, #2e3445, #1c222f)" },
-      { name: "Food Court", unlockAt: 35, foodRate: 900, foodFat: 2, bg: "linear-gradient(160deg, #38443e, #1f2c24)" },
-      { name: "Mega Buffet", unlockAt: 90, foodRate: 650, foodFat: 3, bg: "linear-gradient(160deg, #4b2f2f, #2a1515)" }
+      { name: "Alley", unlockAt: 0, foodRate: 1100, foodFat: 1, bg: "linear-gradient(160deg,#334155,#1e293b)" },
+      { name: "Food Court", unlockAt: 35, foodRate: 840, foodFat: 2, bg: "linear-gradient(160deg,#065f46,#022c22)" },
+      { name: "Mega Buffet", unlockAt: 90, foodRate: 620, foodFat: 3, bg: "linear-gradient(160deg,#7f1d1d,#450a0a)" },
+      { name: "Cosmic Kitchen", unlockAt: 180, foodRate: 500, foodFat: 4, bg: "linear-gradient(160deg,#312e81,#1e1b4b)" }
     ];
 
     const shopItems = [
-      { id: "speed", name: "Speed Sneakers", cost: 12, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
+      { id: "speed", name: "Rocket Sneakers", cost: 12, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
       { id: "mult", name: "Grease Booster", cost: 20, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
-      { id: "spawn", name: "Snack Magnet", cost: 28, desc: "Faster food spawns", apply: s => s.spawnBoost += 170 }
+      { id: "spawn", name: "Snack Magnet", cost: 28, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
+      { id: "coin", name: "Golden Whiskers", cost: 25, desc: "+1 coin per food", apply: s => s.coinBoost += 1 }
     ];
 
     const state = {
@@ -269,12 +271,17 @@
       speed: 3.2,
       fatPerFood: 1,
       spawnBoost: 0,
+      coinBoost: 0,
       zoneIndex: 0,
+      highestUnlockedZone: 0,
       keys: {},
-      rat: { x: 220, y: 180, w: 56, h: 42 },
       foods: [],
       lastSpawn: 0,
-      highestUnlockedZone: 0,
+      rat: { x: 220, y: 180, w: 64, h: 48 },
+      ratName: "Chunky",
+      ratPrimary: "#f5d0fe",
+      ratSecondary: "#a78bfa",
+      ratAccessory: "none",
       uiDirty: true
     };
 
@@ -284,20 +291,22 @@
     const coinStat = document.getElementById("coinStat");
     const earnedStat = document.getElementById("earnedStat");
     const zoneStat = document.getElementById("zoneStat");
-    const shopWrap = document.getElementById("shop");
-    const zonesWrap = document.getElementById("zones");
     const statusMsg = document.getElementById("statusMsg");
+    const shopList = document.getElementById("shopList");
+    const zonesList = document.getElementById("zonesList");
+    const leaderboardList = document.getElementById("leaderboardList");
 
-    function currentZone() {
-      return zones[state.zoneIndex];
-    }
+    function currentZone() { return zones[state.zoneIndex]; }
 
-    function setStatus(msg, color = "#ffd79b") {
+    function setStatus(msg, color = "#fde68a") {
       statusMsg.textContent = msg;
       statusMsg.style.color = color;
       clearTimeout(setStatus.timer);
-      setStatus.timer = setTimeout(() => (statusMsg.textContent = ""), 1800);
+      setStatus.timer = setTimeout(() => (statusMsg.textContent = ""), 2000);
     }
+
+    function openModal(id) { document.querySelector(id).classList.add("open"); }
+    function closeModal(id) { document.querySelector(id).classList.remove("open"); }
 
     function renderHUD() {
       fatStat.textContent = state.fat;
@@ -306,64 +315,115 @@
       zoneStat.textContent = currentZone().name;
       gameArea.style.background = currentZone().bg;
 
-      const sizeScale = 1 + (state.fat * 0.015);
-      ratEl.style.transform = `scale(${Math.min(sizeScale, 2.9)})`;
+      const visualScale = Math.min(1 + state.fat * 0.016, 3.4);
+      ratEl.style.transform = `scale(${visualScale})`;
+
+      // Bigger fat = bigger collection hitbox
+      state.rat.w = 64 * Math.min(1 + state.fat * 0.01, 2.8);
+      state.rat.h = 48 * Math.min(1 + state.fat * 0.01, 2.8);
+
+      ratEl.style.setProperty("--rat-primary", state.ratPrimary);
+      ratEl.style.setProperty("--rat-secondary", state.ratSecondary);
+      ratEl.dataset.accessory = state.ratAccessory;
+      ratEl.textContent = "";
+      ratEl.insertAdjacentHTML("beforeend", `<span class="tail"></span><span class="eye"></span><span class="nose"></span>${accessoryHTML(state.ratAccessory)}`);
+    }
+
+    function accessoryHTML(accessory) {
+      if (accessory === "crown") return `<span style="position:absolute;top:-20px;left:20px;font-size:20px">👑</span>`;
+      if (accessory === "cap") return `<span style="position:absolute;top:-18px;left:18px;font-size:20px">🧢</span>`;
+      if (accessory === "glasses") return `<span style="position:absolute;top:10px;left:14px;font-size:18px">🕶️</span>`;
+      return "";
     }
 
     function renderShop() {
-      shopWrap.innerHTML = "";
+      shopList.innerHTML = "";
       shopItems.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "shop-item";
         const canBuy = state.coins >= item.cost;
-        card.innerHTML = `
-          <strong>${item.name}</strong>
-          <div>${item.desc}</div>
-          <div>Cost: ${item.cost} coins</div>
-          <button data-action="buy" data-item-id="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "Buy" : "Need more coins"}</button>
-        `;
-        shopWrap.appendChild(card);
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins</div></div><button class="ios-btn" data-buy="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "Buy" : "Need Coins"}</button></div>`;
+        shopList.appendChild(card);
       });
     }
 
     function renderZones() {
-      zonesWrap.innerHTML = "";
+      zonesList.innerHTML = "";
       zones.forEach((zone, idx) => {
         const open = state.totalFatEarned >= zone.unlockAt;
+        const current = idx === state.zoneIndex;
         const card = document.createElement("div");
-        card.className = `zone ${open ? "" : "locked"} ${idx === state.zoneIndex ? "active" : ""}`;
-
-        const btnText = idx === state.zoneIndex ? "Current Zone" : open ? "Travel" : `Unlocks at ${zone.unlockAt}`;
-        card.innerHTML = `
-          <strong>${zone.name}</strong>
-          <div>Food bonus: +${zone.foodFat - 1} fat</div>
-          <button data-action="travel" data-zone-index="${idx}" style="margin-top:6px" ${(!open || idx === state.zoneIndex) ? "disabled" : ""}>${btnText}</button>
-        `;
-
-        zonesWrap.appendChild(card);
+        card.className = "card";
+        card.innerHTML = `<div class="row"><div><strong>${zone.name}</strong><div>Unlock: ${zone.unlockAt} fat</div><div>Food bonus: +${zone.foodFat - 1}</div></div><button class="ios-btn secondary" data-zone="${idx}" ${(!open || current) ? "disabled" : ""}>${current ? "Current" : open ? "Travel" : "Locked"}</button></div>`;
+        zonesList.appendChild(card);
       });
     }
 
-    function buyItem(itemId) {
-      const item = shopItems.find(i => i.id === itemId);
+    function loadLeaderboard() {
+      const saved = JSON.parse(localStorage.getItem("fatRatLeaderboard") || "[]");
+      const npc = [
+        { name: "BurgerBeast", fat: 420 },
+        { name: "FriesPhantom", fat: 350 },
+        { name: "CheeseWhale", fat: 260 },
+        { name: "GreaseKing", fat: 200 }
+      ];
+      const merged = [...saved, ...npc]
+        .sort((a, b) => b.fat - a.fat)
+        .slice(0, 20);
+      return merged;
+    }
+
+    function renderLeaderboard() {
+      const board = loadLeaderboard();
+      leaderboardList.innerHTML = "";
+      board.forEach((entry, i) => {
+        const row = document.createElement("div");
+        row.className = "leaderboard-item";
+        row.innerHTML = `<div>${i + 1}.</div><div>${entry.name}</div><div>${entry.fat} fat</div>`;
+        leaderboardList.appendChild(row);
+      });
+    }
+
+    function submitScore() {
+      const nameInput = document.getElementById("leaderboardNameInput");
+      const name = (nameInput.value || state.ratName || "FatRat").trim().slice(0, 18);
+      const saved = JSON.parse(localStorage.getItem("fatRatLeaderboard") || "[]");
+      saved.push({ name, fat: state.totalFatEarned, ts: Date.now() });
+      localStorage.setItem("fatRatLeaderboard", JSON.stringify(saved));
+      renderLeaderboard();
+      setStatus("Score submitted to world leaderboard!", "#86efac");
+    }
+
+    function buyItem(id) {
+      const item = shopItems.find(i => i.id === id);
       if (!item) return;
       if (state.coins < item.cost) return;
       state.coins -= item.cost;
       item.apply(state);
-      setStatus(`Bought ${item.name}!`, "#81f6a4");
       state.uiDirty = true;
+      setStatus(`Bought ${item.name}!`, "#86efac");
     }
 
-    function travelToZone(index) {
-      const idx = Number(index);
-      if (Number.isNaN(idx)) return;
+    function travelToZone(idx) {
       const zone = zones[idx];
       if (!zone) return;
-      const open = state.totalFatEarned >= zone.unlockAt;
-      if (!open || idx === state.zoneIndex) return;
+      if (state.totalFatEarned < zone.unlockAt || state.zoneIndex === idx) return;
       state.zoneIndex = idx;
-      setStatus(`Welcome to ${zone.name}!`, "#81f6a4");
       state.uiDirty = true;
+      setStatus(`Traveled to ${zone.name}`, "#86efac");
+    }
+
+    function maybeAutoUnlockAndTravel() {
+      let newest = 0;
+      for (let i = zones.length - 1; i >= 0; i--) {
+        if (state.totalFatEarned >= zones[i].unlockAt) { newest = i; break; }
+      }
+      if (newest > state.highestUnlockedZone) {
+        state.highestUnlockedZone = newest;
+        state.zoneIndex = newest;
+        state.uiDirty = true;
+        setStatus(`${zones[newest].name} unlocked! Auto-traveled 🚀`, "#86efac");
+      }
     }
 
     function spawnFood() {
@@ -371,122 +431,111 @@
       const emoji = Math.random() > 0.45 ? "🍔" : "🍟";
       const food = {
         id: Math.random().toString(36).slice(2),
-        x: Math.random() * (gameArea.clientWidth - 30),
-        y: Math.random() * (gameArea.clientHeight - 30),
-        emoji,
+        x: Math.random() * (gameArea.clientWidth - 32),
+        y: Math.random() * (gameArea.clientHeight - 32),
         fatValue: zone.foodFat + state.fatPerFood - 1,
-        coinValue: emoji === "🍔" ? 3 : 2
+        coinValue: (emoji === "🍔" ? 3 : 2) + state.coinBoost,
+        emoji
       };
       state.foods.push(food);
-
       const el = document.createElement("div");
-      el.className = "food";
       el.id = food.id;
+      el.className = "food";
       el.style.left = `${food.x}px`;
       el.style.top = `${food.y}px`;
-      el.textContent = emoji;
+      el.textContent = food.emoji;
       gameArea.appendChild(el);
-    }
-
-    function clampRat() {
-      const pad = 2;
-      state.rat.x = Math.max(pad, Math.min(state.rat.x, gameArea.clientWidth - state.rat.w - pad));
-      state.rat.y = Math.max(pad, Math.min(state.rat.y, gameArea.clientHeight - state.rat.h - pad));
-    }
-
-    function updateRat() {
-      const k = state.keys;
-      if (k.ArrowUp || k.w) state.rat.y -= state.speed;
-      if (k.ArrowDown || k.s) state.rat.y += state.speed;
-      if (k.ArrowLeft || k.a) state.rat.x -= state.speed;
-      if (k.ArrowRight || k.d) state.rat.x += state.speed;
-      clampRat();
-      ratEl.style.left = `${state.rat.x}px`;
-      ratEl.style.top = `${state.rat.y}px`;
     }
 
     function intersects(a, b) {
       return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
     }
 
+    function clampRat() {
+      state.rat.x = Math.max(2, Math.min(state.rat.x, gameArea.clientWidth - state.rat.w - 2));
+      state.rat.y = Math.max(2, Math.min(state.rat.y, gameArea.clientHeight - state.rat.h - 2));
+    }
+
+    function updateRat() {
+      if (state.keys.ArrowUp || state.keys.w) state.rat.y -= state.speed;
+      if (state.keys.ArrowDown || state.keys.s) state.rat.y += state.speed;
+      if (state.keys.ArrowLeft || state.keys.a) state.rat.x -= state.speed;
+      if (state.keys.ArrowRight || state.keys.d) state.rat.x += state.speed;
+      clampRat();
+      ratEl.style.left = `${state.rat.x}px`;
+      ratEl.style.top = `${state.rat.y}px`;
+    }
+
     function collectFood() {
       const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
-
-      let collectedAny = false;
+      let gained = false;
       state.foods = state.foods.filter(food => {
         const hit = intersects(ratBox, { x: food.x, y: food.y, w: 24, h: 24 });
         if (!hit) return true;
-
-        collectedAny = true;
         state.fat += food.fatValue;
         state.totalFatEarned += food.fatValue;
         state.coins += food.coinValue;
-
-        const el = document.getElementById(food.id);
-        if (el) el.remove();
+        document.getElementById(food.id)?.remove();
+        gained = true;
         return false;
       });
-
-      if (collectedAny) {
-        state.uiDirty = true;
-      }
-    }
-
-    function maybeAutoUnlockZone() {
-      let newestUnlock = 0;
-      for (let i = zones.length - 1; i >= 0; i--) {
-        if (state.totalFatEarned >= zones[i].unlockAt) {
-          newestUnlock = i;
-          break;
-        }
-      }
-
-      if (newestUnlock > state.highestUnlockedZone) {
-        state.highestUnlockedZone = newestUnlock;
-        state.zoneIndex = newestUnlock;
-        setStatus(`${zones[newestUnlock].name} unlocked! Auto-traveled.`, "#81f6a4");
-        state.uiDirty = true;
-      }
+      if (gained) state.uiDirty = true;
     }
 
     function renderAll() {
       renderHUD();
       renderShop();
       renderZones();
+      renderLeaderboard();
       state.uiDirty = false;
     }
 
     function gameLoop(ts) {
-      const spawnEvery = Math.max(260, currentZone().foodRate - state.spawnBoost);
-      if (ts - state.lastSpawn > spawnEvery && state.foods.length < 18) {
+      const spawnEvery = Math.max(240, currentZone().foodRate - state.spawnBoost);
+      if (ts - state.lastSpawn > spawnEvery && state.foods.length < 20) {
         spawnFood();
         state.lastSpawn = ts;
       }
 
       updateRat();
       collectFood();
-      maybeAutoUnlockZone();
+      maybeAutoUnlockAndTravel();
 
-      if (state.uiDirty) {
-        renderAll();
-      } else {
-        renderHUD();
-      }
+      if (state.uiDirty) renderAll();
+      else renderHUD();
 
       requestAnimationFrame(gameLoop);
     }
 
-    shopWrap.addEventListener("click", e => {
-      const btn = e.target.closest("button[data-action='buy']");
+    document.getElementById("openShopBtn").addEventListener("click", () => openModal("#shopModal"));
+    document.getElementById("openZonesBtn").addEventListener("click", () => openModal("#zonesModal"));
+    document.getElementById("openRatBtn").addEventListener("click", () => openModal("#ratModal"));
+    document.getElementById("openLeaderboardBtn").addEventListener("click", () => openModal("#leaderboardModal"));
+
+    document.querySelectorAll("[data-close]").forEach(btn => btn.addEventListener("click", () => closeModal(btn.dataset.close)));
+
+    shopList.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-buy]");
       if (!btn) return;
-      buyItem(btn.dataset.itemId);
+      buyItem(btn.dataset.buy);
     });
 
-    zonesWrap.addEventListener("click", e => {
-      const btn = e.target.closest("button[data-action='travel']");
+    zonesList.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-zone]");
       if (!btn) return;
-      travelToZone(btn.dataset.zoneIndex);
+      travelToZone(Number(btn.dataset.zone));
     });
+
+    document.getElementById("saveRatBtn").addEventListener("click", () => {
+      state.ratName = document.getElementById("ratNameInput").value.trim() || "Chunky";
+      state.ratPrimary = document.getElementById("ratPrimaryInput").value;
+      state.ratSecondary = document.getElementById("ratSecondaryInput").value;
+      state.ratAccessory = document.getElementById("ratAccessoryInput").value;
+      state.uiDirty = true;
+      setStatus("Rat customization saved!", "#86efac");
+    });
+
+    document.getElementById("submitScoreBtn").addEventListener("click", submitScore);
 
     window.addEventListener("keydown", e => {
       state.keys[e.key] = true;
