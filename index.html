@@ -1621,9 +1621,10 @@
         state.lastSpawn = ts;
       }
 
-      const maxAlive = Math.min(6 + Math.floor(state.wave * 0.85), 36);
-      const enemySpawnEvery = Math.max(300, 1600 - state.wave * 22);
-      if (state.waveSpawnLeft > 0 && ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < maxAlive) {
+      const bossAlive = state.enemies.some(enemy => enemy.boss);
+      const maxAlive = Math.min(6 + Math.floor(state.wave * 0.8), 34);
+      const enemySpawnEvery = Math.max(620, 2350 - state.wave * 14);
+      if (!bossAlive && state.waveSpawnLeft > 0 && ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < maxAlive) {
         spawnEnemy();
         state.waveSpawnLeft -= 1;
         state.lastEnemySpawn = ts;
@@ -1638,7 +1639,7 @@
       state.hp = Math.min(getPlayerMaxHp(), state.hp + regenRate);
       if (!state.waveStarted) {
         startWave(state.wave);
-      } else if (state.waveSpawnLeft <= 0 && state.enemies.length === 0) {
+      } else if (!bossAlive && state.waveSpawnLeft <= 0 && state.enemies.length === 0) {
         state.wave += 1;
         startWave(state.wave);
       }
