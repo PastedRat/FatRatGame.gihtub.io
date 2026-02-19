@@ -47,7 +47,7 @@
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(4, minmax(90px, 1fr));
+      grid-template-columns: repeat(6, minmax(90px, 1fr));
       gap: 8px;
     }
 
@@ -122,9 +122,11 @@
     }
     .rat::before { left: 8px; }
     .rat::after { right: 8px; }
-    .rat .eye { position: absolute; width: 6px; height: 6px; border-radius: 50%; top: 15px; right: 12px; background: #111; box-shadow: -16px 1px 0 #111; }
-    .rat .nose { position: absolute; width: 9px; height: 7px; right: -2px; top: 20px; border-radius: 50%; background: #fb7185; }
-    .rat .tail { position: absolute; width: 36px; height: 8px; left: -28px; top: 26px; border-radius: 10px; transform: rotate(-10deg); background: linear-gradient(90deg, #c084fc, #f9a8d4); }
+    .rat .eye { position: absolute; width: 6px; height: 6px; border-radius: 50%; top: 15px; right: 12px; background: var(--rat-eye, #111); box-shadow: -16px 1px 0 var(--rat-eye, #111); }
+    .rat .nose { position: absolute; width: 9px; height: 7px; right: -2px; top: 20px; border-radius: 50%; background: var(--rat-nose, #fb7185); }
+    .rat .tail { position: absolute; width: 36px; height: 8px; left: -28px; top: 26px; border-radius: var(--rat-tail-radius, 10px); transform: rotate(-10deg); background: linear-gradient(90deg, var(--rat-tail-a, #c084fc), var(--rat-tail-b, #f9a8d4)); }
+    .rat .stripe { position:absolute; left: 8px; top: 8px; width: 36px; height: 4px; border-radius: 8px; background: rgba(255,255,255,.45); transform: rotate(-10deg); }
+    .rat .stripe.two { top: 16px; width: 28px; opacity: .7; }
 
     .food {
       position: absolute;
@@ -174,9 +176,50 @@
     .leaderboard-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
     .status { font-weight: 700; min-height: 22px; color: #fde68a; margin-top: 6px; }
 
+    .mobile-controls {
+      position: fixed;
+      z-index: 45;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(340px, calc(100vw - 24px));
+      display: none;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px;
+      border-radius: 18px;
+      backdrop-filter: blur(10px);
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(255,255,255,.2);
+    }
+
+    .pad-btn {
+      border: none;
+      border-radius: 14px;
+      min-height: 48px;
+      font-size: 1.3rem;
+      color: white;
+      background: linear-gradient(180deg, rgba(96,165,250,.95), rgba(37,99,235,.95));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+      touch-action: none;
+    }
+
+    .pad-btn.empty { visibility: hidden; }
+
+    .mode-chip {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(2,6,23,.35);
+      font-size: .8rem;
+      margin-top: 4px;
+    }
+
     @media (max-width: 760px) {
-      .stats { grid-template-columns: repeat(2, 1fr); }
-      #gameArea { min-height: 64vh; }
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      #gameArea { min-height: 58vh; margin-bottom: 130px; }
+      .mobile-controls { display: grid; }
     }
   </style>
 </head>
@@ -187,12 +230,15 @@
       <div class="pill">🧀 Coins <span id="coinStat">0</span></div>
       <div class="pill">📈 Earned <span id="earnedStat">0</span></div>
       <div class="pill">🌍 <span id="zoneStat">Alley</span></div>
+      <div class="pill">⚡ <span id="modeStat">Classic</span></div>
+      <div class="pill">🔥 Combo <span id="comboStat">x1</span></div>
     </div>
     <div class="button-row">
       <button class="ios-btn" id="openShopBtn">Boosts</button>
       <button class="ios-btn secondary" id="openZonesBtn">Zones</button>
       <button class="ios-btn" id="openRatBtn">Customize Rat</button>
       <button class="ios-btn secondary" id="openLeaderboardBtn">World Leaderboard</button>
+      <button class="ios-btn" id="openModesBtn">Game Modes</button>
     </div>
     <div class="pill">Move with WASD / Arrow Keys</div>
     <div class="status" id="statusMsg"></div>
@@ -223,6 +269,10 @@
         <div class="row"><label>Rat Name</label><input id="ratNameInput" maxlength="18" placeholder="Chunky" /></div>
         <div class="row"><label>Primary Color</label><input id="ratPrimaryInput" type="color" value="#f5d0fe" /></div>
         <div class="row"><label>Secondary Color</label><input id="ratSecondaryInput" type="color" value="#a78bfa" /></div>
+        <div class="row"><label>Eye Color</label><input id="ratEyeInput" type="color" value="#111111" /></div>
+        <div class="row"><label>Nose Color</label><input id="ratNoseInput" type="color" value="#fb7185" /></div>
+        <div class="row"><label>Tail Style</label><select id="ratTailInput"><option value="smooth">Smooth</option><option value="chunky">Chunky</option><option value="spike">Spike</option></select></div>
+        <div class="row"><label>Pattern</label><select id="ratPatternInput"><option value="none">None</option><option value="stripes">Stripes</option></select></div>
         <div class="row"><label>Accessory</label>
           <select id="ratAccessoryInput">
             <option value="none">None</option>
@@ -233,6 +283,14 @@
         </div>
         <button class="ios-btn" id="saveRatBtn">Save Customization</button>
       </div>
+    </div>
+  </div>
+
+
+  <div class="modal" id="modesModal">
+    <div class="sheet">
+      <div class="row"><h2>🎮 Game Modes</h2><button class="ios-btn secondary" data-close="#modesModal">Close</button></div>
+      <div id="modesList"></div>
     </div>
   </div>
 
@@ -250,6 +308,15 @@
     </div>
   </div>
 
+  <div class="mobile-controls" id="mobileControls" aria-label="Touch controls">
+    <button class="pad-btn empty" tabindex="-1">•</button>
+    <button class="pad-btn" data-touch="up">⬆️</button>
+    <button class="pad-btn empty" tabindex="-1">•</button>
+    <button class="pad-btn" data-touch="left">⬅️</button>
+    <button class="pad-btn" data-touch="down">⬇️</button>
+    <button class="pad-btn" data-touch="right">➡️</button>
+  </div>
+
   <script>
     const zones = [
       { name: "Alley", unlockAt: 0, foodRate: 1100, foodFat: 1, bg: "linear-gradient(160deg,#334155,#1e293b)" },
@@ -263,6 +330,13 @@
       { id: "mult", name: "Grease Booster", cost: 20, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
       { id: "spawn", name: "Snack Magnet", cost: 28, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
       { id: "coin", name: "Golden Whiskers", cost: 25, desc: "+1 coin per food", apply: s => s.coinBoost += 1 }
+    ];
+
+    const gameModes = [
+      { id: "classic", name: "Classic", desc: "Balanced gameplay.", fatMul: 1, spawnMul: 1, coinBonus: 0 },
+      { id: "feast", name: "Feast Frenzy", desc: "Way more food and fat gain.", fatMul: 1.35, spawnMul: 0.75, coinBonus: 1 },
+      { id: "rush", name: "Turbo Rush", desc: "Fast rat, faster zone progression.", fatMul: 1.15, spawnMul: 0.85, coinBonus: 0 },
+      { id: "challenge", name: "Grease Challenge", desc: "Hard mode, but juicy rewards.", fatMul: 1.6, spawnMul: 1.25, coinBonus: 2 }
     ];
 
     const state = {
@@ -282,7 +356,17 @@
       ratName: "Chunky",
       ratPrimary: "#f5d0fe",
       ratSecondary: "#a78bfa",
+      ratEye: "#111111",
+      ratNose: "#fb7185",
+      ratTail: "smooth",
+      ratPattern: "none",
       ratAccessory: "none",
+      currentMode: "classic",
+      modeFatMultiplier: 1,
+      modeSpawnMultiplier: 1,
+      modeCoinBonus: 0,
+      combo: 1,
+      touch: { up: false, down: false, left: false, right: false },
       playerId: localStorage.getItem("fatRatPlayerId") || crypto.randomUUID(),
       remoteBoard: [],
       leaderboardError: "",
@@ -297,9 +381,12 @@
     const coinStat = document.getElementById("coinStat");
     const earnedStat = document.getElementById("earnedStat");
     const zoneStat = document.getElementById("zoneStat");
+    const modeStat = document.getElementById("modeStat");
+    const comboStat = document.getElementById("comboStat");
     const statusMsg = document.getElementById("statusMsg");
     const shopList = document.getElementById("shopList");
     const zonesList = document.getElementById("zonesList");
+    const modesList = document.getElementById("modesList");
     const leaderboardList = document.getElementById("leaderboardList");
     const myRankText = document.getElementById("myRankText");
     localStorage.setItem("fatRatPlayerId", state.playerId);
@@ -321,6 +408,8 @@
       coinStat.textContent = state.coins;
       earnedStat.textContent = state.totalFatEarned;
       zoneStat.textContent = currentZone().name;
+      modeStat.textContent = gameModes.find(m => m.id === state.currentMode)?.name || "Classic";
+      comboStat.textContent = `x${state.combo.toFixed(1)}`;
       gameArea.style.background = currentZone().bg;
 
       const visualScale = Math.min(1 + state.fat * 0.016, 3.4);
@@ -332,9 +421,14 @@
 
       ratEl.style.setProperty("--rat-primary", state.ratPrimary);
       ratEl.style.setProperty("--rat-secondary", state.ratSecondary);
+      ratEl.style.setProperty("--rat-eye", state.ratEye);
+      ratEl.style.setProperty("--rat-nose", state.ratNose);
+      ratEl.style.setProperty("--rat-tail-radius", state.ratTail === "chunky" ? "16px" : state.ratTail === "spike" ? "2px" : "10px");
+      ratEl.style.setProperty("--rat-tail-a", state.ratTail === "spike" ? "#f97316" : "#c084fc");
+      ratEl.style.setProperty("--rat-tail-b", state.ratTail === "spike" ? "#ef4444" : "#f9a8d4");
       ratEl.dataset.accessory = state.ratAccessory;
       ratEl.textContent = "";
-      ratEl.insertAdjacentHTML("beforeend", `<span class="tail"></span><span class="eye"></span><span class="nose"></span>${accessoryHTML(state.ratAccessory)}`);
+      ratEl.insertAdjacentHTML("beforeend", `<span class="tail"></span><span class="eye"></span><span class="nose"></span>${state.ratPattern === "stripes" ? `<span class="stripe"></span><span class="stripe two"></span>` : ""}${accessoryHTML(state.ratAccessory)}`);
     }
 
     function accessoryHTML(accessory) {
@@ -365,6 +459,28 @@
         card.innerHTML = `<div class="row"><div><strong>${zone.name}</strong><div>Unlock: ${zone.unlockAt} fat</div><div>Food bonus: +${zone.foodFat - 1}</div></div><button class="ios-btn secondary" data-zone="${idx}" ${(!open || current) ? "disabled" : ""}>${current ? "Current" : open ? "Travel" : "Locked"}</button></div>`;
         zonesList.appendChild(card);
       });
+    }
+
+    function renderModes() {
+      modesList.innerHTML = "";
+      gameModes.forEach(mode => {
+        const active = state.currentMode === mode.id;
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="row"><div><strong>${mode.name}</strong><div>${mode.desc}</div><div class="mode-chip">Fat x${mode.fatMul} • Spawn x${mode.spawnMul} • +${mode.coinBonus} coins</div></div><button class="ios-btn" data-mode="${mode.id}" ${active ? "disabled" : ""}>${active ? "Active" : "Play"}</button></div>`;
+        modesList.appendChild(card);
+      });
+    }
+
+    function setGameMode(id) {
+      const mode = gameModes.find(x => x.id === id);
+      if (!mode) return;
+      state.currentMode = mode.id;
+      state.modeFatMultiplier = mode.fatMul;
+      state.modeSpawnMultiplier = mode.spawnMul;
+      state.modeCoinBonus = mode.coinBonus;
+      state.uiDirty = true;
+      setStatus(`Mode switched: ${mode.name}`, "#93c5fd");
     }
 
     const LEADERBOARD_API_BASE = "https://geraldburke.com/apps/simple-leaderboard/";
@@ -488,6 +604,13 @@
 
       state.leaderboardError = "API unavailable, showing cached/local leaderboard.";
       return [];
+    }
+
+    async function refreshLeaderboardFromApi() {
+      const entries = await fetchRemoteLeaderboard();
+      if (entries.length) state.uiDirty = true;
+      renderLeaderboard();
+      return entries;
     }
 
     async function submitRemoteScore(entry) {
@@ -640,10 +763,11 @@
     }
 
     function updateRat() {
-      if (state.keys.ArrowUp || state.keys.w) state.rat.y -= state.speed;
-      if (state.keys.ArrowDown || state.keys.s) state.rat.y += state.speed;
-      if (state.keys.ArrowLeft || state.keys.a) state.rat.x -= state.speed;
-      if (state.keys.ArrowRight || state.keys.d) state.rat.x += state.speed;
+      const moveSpeed = state.speed + (state.currentMode === "rush" ? 0.9 : 0);
+      if (state.keys.ArrowUp || state.keys.w || state.touch.up) state.rat.y -= moveSpeed;
+      if (state.keys.ArrowDown || state.keys.s || state.touch.down) state.rat.y += moveSpeed;
+      if (state.keys.ArrowLeft || state.keys.a || state.touch.left) state.rat.x -= moveSpeed;
+      if (state.keys.ArrowRight || state.keys.d || state.touch.right) state.rat.x += moveSpeed;
       clampRat();
       ratEl.style.left = `${state.rat.x}px`;
       ratEl.style.top = `${state.rat.y}px`;
@@ -655,9 +779,12 @@
       state.foods = state.foods.filter(food => {
         const hit = intersects(ratBox, { x: food.x, y: food.y, w: 24, h: 24 });
         if (!hit) return true;
-        state.fat += food.fatValue;
-        state.totalFatEarned += food.fatValue;
-        state.coins += food.coinValue;
+        const comboBoost = Math.min(1 + (state.combo - 1) * 0.08, 2.2);
+        const fatGain = Math.max(1, Math.round(food.fatValue * state.modeFatMultiplier * comboBoost));
+        state.fat += fatGain;
+        state.totalFatEarned += fatGain;
+        state.coins += food.coinValue + state.modeCoinBonus;
+        state.combo = Math.min(state.combo + 1, 25);
         document.getElementById(food.id)?.remove();
         gained = true;
         return false;
@@ -665,6 +792,8 @@
       if (gained) {
         state.uiDirty = true;
         syncMyScore();
+      } else {
+        state.combo = Math.max(1, state.combo - 0.03);
       }
     }
 
@@ -672,12 +801,13 @@
       renderHUD();
       renderShop();
       renderZones();
+      renderModes();
       renderLeaderboard();
       state.uiDirty = false;
     }
 
     function gameLoop(ts) {
-      const spawnEvery = Math.max(240, currentZone().foodRate - state.spawnBoost);
+      const spawnEvery = Math.max(180, (currentZone().foodRate - state.spawnBoost) * state.modeSpawnMultiplier);
       if (ts - state.lastSpawn > spawnEvery && state.foods.length < 20) {
         spawnFood();
         state.lastSpawn = ts;
@@ -696,11 +826,12 @@
     document.getElementById("openShopBtn").addEventListener("click", () => openModal("#shopModal"));
     document.getElementById("openZonesBtn").addEventListener("click", () => openModal("#zonesModal"));
     document.getElementById("openRatBtn").addEventListener("click", () => openModal("#ratModal"));
+    document.getElementById("openModesBtn").addEventListener("click", () => openModal("#modesModal"));
     document.getElementById("openLeaderboardBtn").addEventListener("click", async () => {
       openModal("#leaderboardModal");
-      await fetchRemoteLeaderboard();
+      await refreshLeaderboardFromApi();
       await syncMyScore(true);
-      renderLeaderboard();
+      await refreshLeaderboardFromApi();
     });
 
     document.querySelectorAll("[data-close]").forEach(btn => btn.addEventListener("click", () => closeModal(btn.dataset.close)));
@@ -717,10 +848,20 @@
       travelToZone(Number(btn.dataset.zone));
     });
 
+    modesList.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-mode]");
+      if (!btn) return;
+      setGameMode(btn.dataset.mode);
+    });
+
     document.getElementById("saveRatBtn").addEventListener("click", () => {
       state.ratName = document.getElementById("ratNameInput").value.trim() || "Chunky";
       state.ratPrimary = document.getElementById("ratPrimaryInput").value;
       state.ratSecondary = document.getElementById("ratSecondaryInput").value;
+      state.ratEye = document.getElementById("ratEyeInput").value;
+      state.ratNose = document.getElementById("ratNoseInput").value;
+      state.ratTail = document.getElementById("ratTailInput").value;
+      state.ratPattern = document.getElementById("ratPatternInput").value;
       state.ratAccessory = document.getElementById("ratAccessoryInput").value;
       state.uiDirty = true;
       syncMyScore(true);
@@ -739,11 +880,37 @@
       state.keys[e.key.toLowerCase()] = false;
     });
 
+    const mobileControls = document.getElementById("mobileControls");
+    mobileControls.querySelectorAll("[data-touch]").forEach(btn => {
+      const dir = btn.dataset.touch;
+      const down = event => {
+        event.preventDefault();
+        state.touch[dir] = true;
+      };
+      const up = event => {
+        event.preventDefault();
+        state.touch[dir] = false;
+      };
+      btn.addEventListener("pointerdown", down);
+      btn.addEventListener("pointerup", up);
+      btn.addEventListener("pointerleave", up);
+      btn.addEventListener("pointercancel", up);
+    });
+
     window.addEventListener("resize", clampRat);
 
+    async function initializeLeaderboardOnJoin() {
+      await refreshLeaderboardFromApi();
+      await syncMyScore(true);
+      await refreshLeaderboardFromApi();
+      setInterval(() => {
+        refreshLeaderboardFromApi();
+      }, 20000);
+    }
+
+    setGameMode("classic");
     renderAll();
-    fetchRemoteLeaderboard().then(() => { renderLeaderboard(); });
-    syncMyScore(true);
+    initializeLeaderboardOnJoin();
     requestAnimationFrame(gameLoop);
   </script>
 </body>
