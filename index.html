@@ -141,14 +141,33 @@
 
     .enemy {
       position: absolute;
-      width: 44px;
-      height: 44px;
-      font-size: 30px;
-      display: grid;
-      place-items: center;
+      width: 50px;
+      height: 40px;
+      border-radius: 54% 46% 50% 50%;
+      background: radial-gradient(circle at 30% 30%, var(--enemy-primary, #d8b4fe), var(--enemy-secondary, #7c3aed) 72%);
+      box-shadow: inset -8px -8px rgba(0,0,0,.2), 0 7px 10px rgba(0,0,0,.35);
       filter: drop-shadow(0 6px 6px rgba(0,0,0,.35));
       pointer-events: none;
+      transform-origin: center;
+      animation: enemy-walk .4s ease-in-out infinite alternate;
     }
+
+    .enemy::before,.enemy::after {
+      content: "";
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      top: -4px;
+      background: color-mix(in oklab, var(--enemy-primary, #d8b4fe) 85%, white);
+      border: 2px solid rgba(0,0,0,.2);
+    }
+    .enemy::before { left: 8px; }
+    .enemy::after { right: 8px; }
+    .enemy-tail { position: absolute; width: 28px; height: 7px; left: -21px; top: 22px; border-radius: 8px; transform: rotate(-12deg); background: linear-gradient(90deg,#a78bfa,#f9a8d4); }
+    .enemy-eye { position: absolute; width: 5px; height: 5px; border-radius: 50%; top: 13px; right: 10px; background: #111; box-shadow: -14px 1px 0 #111; }
+    .enemy-nose { position: absolute; width: 8px; height: 6px; right: -2px; top: 17px; border-radius: 50%; background: #fb7185; }
+    .enemy-badge { position: absolute; right: -6px; top: -14px; font-size: 15px; }
 
     .enemy-hp {
       position: absolute;
@@ -204,6 +223,36 @@
       place-items: center;
       pointer-events: none;
     }
+
+    .helper-rat {
+      position: absolute;
+      width: 28px;
+      height: 22px;
+      border-radius: 52% 48% 50% 50%;
+      background: radial-gradient(circle at 30% 30%, #fde68a, #f59e0b 72%);
+      box-shadow: inset -6px -5px rgba(0,0,0,.2), 0 5px 8px rgba(0,0,0,.3);
+      pointer-events: none;
+      animation: helper-walk .32s ease-in-out infinite alternate;
+      transform-origin: center;
+    }
+
+    .helper-rat::before,
+    .helper-rat::after {
+      content: "";
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      top: -3px;
+      background: #fef3c7;
+    }
+    .helper-rat::before { left: 4px; }
+    .helper-rat::after { right: 4px; }
+    .helper-tail { position: absolute; width: 16px; height: 4px; left: -12px; top: 12px; border-radius: 8px; background: #fda4af; }
+    .helper-eye { position: absolute; width: 4px; height: 4px; border-radius: 50%; top: 8px; right: 6px; background: #111; box-shadow: -8px 1px 0 #111; }
+
+    @keyframes enemy-walk { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(1px) rotate(2deg); } }
+    @keyframes helper-walk { from { transform: translateY(0) scale(1); } to { transform: translateY(1px) scale(1.03); } }
 
     .modal {
       position: fixed;
@@ -306,6 +355,7 @@
       <div class="pill">🔥 Combo <span id="comboStat">x1</span></div>
       <div class="pill">❤️ HP <span id="hpStat">100</span></div>
       <div class="pill">🌊 Wave <span id="waveStat">1</span></div>
+      <div class="pill">🐣 Helpers <span id="helperStat">0</span></div>
     </div>
     <div class="button-row">
       <button class="ios-btn" id="openShopBtn">Boosts</button>
@@ -430,7 +480,11 @@
       { id: "armor", name: "Cheese Armor", cost: 34, desc: "+10 max HP", apply: s => { s.maxHp += 10; s.hp = Math.min(s.maxHp, s.hp + 8); } },
       { id: "regen", name: "Regeneration Soda", cost: 45, desc: "+0.12 HP regen", apply: s => s.hpRegen += 0.12 },
       { id: "damage", name: "Spicy Bite", cost: 38, desc: "+1 rat damage", apply: s => s.damage += 1 },
-      { id: "vacuum", name: "Vacuum Belly", cost: 50, desc: "+4 pickup hitbox", apply: s => s.hitboxBonus += 4 }
+      { id: "vacuum", name: "Vacuum Belly", cost: 50, desc: "+4 pickup hitbox", apply: s => s.hitboxBonus += 4 },
+      { id: "fangs", name: "Steel Fangs", cost: 56, desc: "+2 attack", apply: s => s.damage += 2 },
+      { id: "shell", name: "Titan Shell", cost: 62, desc: "+2 defense", apply: s => s.defense += 2 },
+      { id: "vital", name: "Giga Vitamins", cost: 60, desc: "+18 max HP", apply: s => { s.maxHp += 18; s.hp = Math.min(s.maxHp, s.hp + 12); } },
+      { id: "helper", name: "Rat Whistle", cost: 95, desc: "+1 helper rat (max 5)", apply: s => s.helperCount = Math.min(5, s.helperCount + 1) }
     ];
 
     const gameModes = [
@@ -446,7 +500,10 @@
       { id: "keyboard", name: "RGB Keyboard", cost: 70, bonus: "+0.5 speed", spawn: "⌨️", effect: s => s.speed += 0.5 },
       { id: "mouse", name: "Pro Mouse", cost: 80, bonus: "+1 damage", spawn: "🖱️", effect: s => s.damage += 1 },
       { id: "gpu", name: "Rat RTX", cost: 120, bonus: "+10% fat gain", spawn: "🧩", effect: s => s.pcFatBonus += 0.1 },
-      { id: "headset", name: "Gamer Headset", cost: 90, bonus: "+0.15 HP regen", spawn: "🎧", effect: s => s.hpRegen += 0.15 }
+      { id: "headset", name: "Gamer Headset", cost: 90, bonus: "+0.15 HP regen", spawn: "🎧", effect: s => s.hpRegen += 0.15 },
+      { id: "chair", name: "Tank Chair", cost: 110, bonus: "+3 defense", spawn: "🪑", effect: s => s.defense += 3 },
+      { id: "mic", name: "Battle Mic", cost: 100, bonus: "+2 attack", spawn: "🎙️", effect: s => s.damage += 2 },
+      { id: "monitor", name: "Ultra Monitor", cost: 125, bonus: "+14 max HP", spawn: "🖥️", effect: s => { s.maxHp += 14; s.hp = Math.min(s.maxHp, s.hp + 10); } }
     ];
 
     const state = {
@@ -481,6 +538,10 @@
       maxHp: 100,
       hpRegen: 0.08,
       damage: 2,
+      defense: 0,
+      helperCount: 0,
+      helperAttack: 1.4,
+      helperRats: [],
       hitboxBonus: 0,
       wave: 1,
       enemies: [],
@@ -510,6 +571,7 @@
     const comboStat = document.getElementById("comboStat");
     const hpStat = document.getElementById("hpStat");
     const waveStat = document.getElementById("waveStat");
+    const helperStat = document.getElementById("helperStat");
     const statusMsg = document.getElementById("statusMsg");
     const bossHpWrap = document.getElementById("bossHpWrap");
     const bossHpFill = document.getElementById("bossHpFill");
@@ -523,6 +585,37 @@
     localStorage.setItem("fatRatPlayerId", state.playerId);
 
     function currentZone() { return zones[state.zoneIndex]; }
+
+    function getPlayerAttack() {
+      let attack = state.damage;
+      if (state.pcEquipped.mouse) attack += 1;
+      if (state.pcEquipped.mic) attack += 2;
+      return attack;
+    }
+
+    function getPlayerDefense() {
+      let defense = state.defense;
+      if (state.pcEquipped.chair) defense += 3;
+      return defense;
+    }
+
+    function getPlayerMaxHp() {
+      let maxHp = state.maxHp;
+      if (state.pcEquipped.monitor) maxHp += 14;
+      return maxHp;
+    }
+
+    function getPlayerHpRegen() {
+      let regen = state.hpRegen;
+      if (state.pcEquipped.headset) regen += 0.15;
+      return regen;
+    }
+
+    function getPlayerFatBonus() {
+      let bonus = state.pcFatBonus;
+      if (state.pcEquipped.gpu) bonus += 0.1;
+      return bonus;
+    }
 
     function setStatus(msg, color = "#fde68a") {
       statusMsg.textContent = msg;
@@ -541,8 +634,10 @@
       zoneStat.textContent = currentZone().name;
       modeStat.textContent = gameModes.find(m => m.id === state.currentMode)?.name || "Classic";
       comboStat.textContent = `x${state.combo.toFixed(1)}`;
-      hpStat.textContent = Math.round(state.hp);
+      state.hp = Math.min(state.hp, getPlayerMaxHp());
+      hpStat.textContent = `${Math.round(state.hp)}/${Math.round(getPlayerMaxHp())}`;
       waveStat.textContent = state.wave;
+      helperStat.textContent = state.helperCount;
       gameArea.style.background = currentZone().bg;
 
       const visualScale = Math.min(1 + state.fat * 0.016, 3.4);
@@ -903,10 +998,10 @@
 
 
     const enemyTypes = {
-      bandit: { name: "Rat Bandit", hp: 50, speed: 1.8, damage: 4, defense: 0, emoji: "🥷" },
-      shooter: { name: "Rat Shooter", hp: 150, speed: 1.1, damage: 5, defense: 10, range: 220, fireRate: 900, emoji: "🔫" },
-      fast: { name: "Fast Rat", hp: 25, speed: 3.6, damage: 3, defense: 0, emoji: "⚡" },
-      king: { name: "KING RAT 👑", hp: 1000, speed: 0.6, damage: 12, defense: 20, boss: true, emoji: "👑" }
+      bandit: { name: "Rat Bandit", hp: 50, speed: 1.8, damage: 4, defense: 0, badge: "🗡️", primary: "#fca5a5", secondary: "#b91c1c" },
+      shooter: { name: "Rat Shooter", hp: 150, speed: 1.1, damage: 5, defense: 10, range: 220, fireRate: 900, badge: "🔫", primary: "#93c5fd", secondary: "#1d4ed8" },
+      fast: { name: "Fast Rat", hp: 25, speed: 3.6, damage: 3, defense: 0, badge: "⚡", primary: "#fef08a", secondary: "#ca8a04" },
+      king: { name: "KING RAT 👑", hp: 1000, speed: 0.6, damage: 12, defense: 20, boss: true, badge: "👑", primary: "#e9d5ff", secondary: "#6d28d9" }
     };
 
     function pickEnemyType() {
@@ -932,7 +1027,7 @@
     }
 
     function damageEnemy(enemy, amount) {
-      const real = Math.max(1, amount - (enemy.defense || 0) * 0.05);
+      const real = Math.max(1, amount - (enemy.defense || 0) * 0.5);
       enemy.hp -= real;
       enemy.wasDamaged = true;
       const hpFill = document.querySelector(`#${enemy.id} .enemy-hp-fill`);
@@ -963,7 +1058,9 @@
         boss: !!type.boss,
         wasDamaged: false,
         name: type.name,
-        emoji: type.emoji
+        badge: type.badge || "",
+        primary: type.primary || "#d8b4fe",
+        secondary: type.secondary || "#7c3aed"
       };
       if (enemy.boss) state.bossEnemyId = enemy.id;
       state.enemies.push(enemy);
@@ -972,7 +1069,10 @@
       el.className = "enemy";
       el.style.left = `${enemy.x}px`;
       el.style.top = `${enemy.y}px`;
-      el.innerHTML = `<div class="enemy-hp"><div class="enemy-hp-fill"></div></div><span>${enemy.emoji}</span>`;
+      el.style.setProperty("--enemy-primary", enemy.primary);
+      el.style.setProperty("--enemy-secondary", enemy.secondary);
+      if (enemy.boss) { el.style.width = "62px"; el.style.height = "48px"; }
+      el.innerHTML = `<div class="enemy-hp"><div class="enemy-hp-fill"></div></div><span class="enemy-tail"></span><span class="enemy-eye"></span><span class="enemy-nose"></span><span class="enemy-badge">${enemy.badge || ""}</span>`;
       gameArea.appendChild(el);
       updateBossHud();
     }
@@ -1047,7 +1147,7 @@
         const hit = intersects(ratBox, { x: food.x, y: food.y, w: 24, h: 24 });
         if (!hit) return true;
         const comboBoost = Math.min(1 + (state.combo - 1) * 0.08, 2.2);
-        const fatGain = Math.max(1, Math.round(food.fatValue * state.modeFatMultiplier * (1 + state.pcFatBonus) * comboBoost));
+        const fatGain = Math.max(1, Math.round(food.fatValue * state.modeFatMultiplier * (1 + getPlayerFatBonus()) * comboBoost));
         state.fat += fatGain;
         state.totalFatEarned += fatGain;
         state.coins += food.coinValue + state.modeCoinBonus;
@@ -1074,7 +1174,7 @@
 
         if (enemy.type === "shooter" && dist < enemy.range) {
           if (ts - enemy.lastShot > enemy.fireRate) {
-            state.hp -= enemy.damage * 0.7;
+            state.hp -= Math.max(0.5, enemy.damage * 0.7 - getPlayerDefense() * 0.5);
             enemy.lastShot = ts;
           }
         } else {
@@ -1093,8 +1193,8 @@
       state.enemies = state.enemies.filter(enemy => {
         const enemyBox = { x: enemy.x, y: enemy.y, w: enemy.boss ? 46 : 34, h: enemy.boss ? 46 : 34 };
         if (intersects(ratBox, enemyBox)) {
-          state.hp -= enemy.damage * 0.04;
-          damageEnemy(enemy, state.damage * 0.65);
+          state.hp -= Math.max(0.2, enemy.damage * 0.04 - getPlayerDefense() * 0.5 * 0.04);
+          damageEnemy(enemy, getPlayerAttack() * 0.65);
         }
         if (enemy.hp <= 0) {
           state.coins += enemy.boss ? 120 : enemy.type === "shooter" ? 18 : 10;
@@ -1111,12 +1211,67 @@
 
       updateBossHud();
       if (state.hp <= 0) {
-        state.hp = state.maxHp;
+        state.hp = getPlayerMaxHp();
         state.wave = Math.max(1, state.wave - 1);
         state.fat = Math.max(0, state.fat - 30);
         state.combo = 1;
         setStatus("You got bonked! Respawned with HP reset.", "#fca5a5");
       }
+    }
+
+
+    function ensureHelperRats() {
+      while (state.helperRats.length < state.helperCount) {
+        const helper = {
+          id: `helper-${Math.random().toString(36).slice(2)}`,
+          x: state.rat.x - 20,
+          y: state.rat.y + 20,
+          swing: Math.random() * Math.PI * 2
+        };
+        state.helperRats.push(helper);
+        const el = document.createElement("div");
+        el.id = helper.id;
+        el.className = "helper-rat";
+        el.innerHTML = `<span class="helper-tail"></span><span class="helper-eye"></span>`;
+        gameArea.appendChild(el);
+      }
+      while (state.helperRats.length > state.helperCount) {
+        const removed = state.helperRats.pop();
+        document.getElementById(removed.id)?.remove();
+      }
+    }
+
+    function updateHelperRats(ts) {
+      ensureHelperRats();
+      const aliveEnemies = state.enemies.filter(e => e.hp > 0);
+      state.helperRats.forEach((helper, idx) => {
+        helper.swing += 0.08 + idx * 0.005;
+        const orbit = 42 + idx * 8;
+        helper.x += ((state.rat.x + Math.cos(helper.swing) * orbit) - helper.x) * 0.2;
+        helper.y += ((state.rat.y + 18 + Math.sin(helper.swing * 1.2) * 16) - helper.y) * 0.2;
+        const el = document.getElementById(helper.id);
+        if (el) {
+          el.style.left = `${helper.x}px`;
+          el.style.top = `${helper.y}px`;
+        }
+
+        let target = null;
+        let best = Infinity;
+        aliveEnemies.forEach(enemy => {
+          const d = Math.hypot(enemy.x - helper.x, enemy.y - helper.y);
+          if (d < best) { best = d; target = enemy; }
+        });
+
+        if (target && best < 96) {
+          damageEnemy(target, state.helperAttack + getPlayerAttack() * 0.18);
+          if (el) {
+            el.style.transform = "scale(1.16) translateY(-2px)";
+            setTimeout(() => {
+              if (document.getElementById(helper.id)) el.style.transform = "";
+            }, 90);
+          }
+        }
+      });
     }
 
     function collectPickups() {
@@ -1161,7 +1316,7 @@
         state.lastPickupSpawn = ts;
       }
 
-      state.hp = Math.min(state.maxHp, state.hp + state.hpRegen);
+      state.hp = Math.min(getPlayerMaxHp(), state.hp + getPlayerHpRegen());
       if (state.totalFatEarned > state.wave * 120) {
         state.wave += 1;
         state.uiDirty = true;
@@ -1171,6 +1326,7 @@
       updateRat();
       collectFood();
       collectPickups();
+      updateHelperRats(ts);
       updateEnemies(ts);
       maybeAutoUnlockAndTravel();
 
