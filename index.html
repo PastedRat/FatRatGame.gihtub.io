@@ -214,6 +214,18 @@
       background: linear-gradient(90deg,#f97316,#ef4444);
     }
 
+    .enemy-bullet {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 32% 32%, #fef3c7, #f97316 70%);
+      border: 1px solid rgba(255,255,255,.5);
+      box-shadow: 0 0 0 2px rgba(249,115,22,.18), 0 0 12px rgba(249,115,22,.55);
+      pointer-events: none;
+      z-index: 6;
+    }
+
     .pickup {
       position: absolute;
       width: 30px;
@@ -292,6 +304,28 @@
     .leaderboard-item { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,.1); }
     .status { font-weight: 700; min-height: 22px; color: #fde68a; margin-top: 6px; }
 
+    .wave-pop {
+      position: fixed;
+      left: 50%;
+      top: 18%;
+      transform: translate(-50%, -20px) scale(.9);
+      padding: 16px 22px;
+      border-radius: 16px;
+      background: rgba(15,23,42,.88);
+      border: 1px solid rgba(255,255,255,.28);
+      box-shadow: 0 18px 36px rgba(0,0,0,.35);
+      font-weight: 800;
+      z-index: 80;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .35s ease, transform .35s ease;
+    }
+
+    .wave-pop.show {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
+
     .mobile-controls {
       position: fixed;
       z-index: 45;
@@ -367,6 +401,7 @@
     </div>
     <div class="pill">Move with WASD / Arrow Keys • Survive waves</div>
     <div class="status" id="statusMsg"></div>
+    <div id="wavePopup" class="wave-pop" aria-live="polite"></div>
     <div class="boss-hp-wrap" id="bossHpWrap">
       <div id="bossHpLabel" style="font-weight:700;margin-bottom:4px">KING RAT 👑 1000/1000 HP</div>
       <div class="boss-hp-track"><div class="boss-hp-fill" id="bossHpFill"></div></div>
@@ -381,6 +416,7 @@
     <div class="sheet">
       <div class="row"><h2>🛒 Boost Shop</h2><button class="ios-btn secondary" data-close="#shopModal">Close</button></div>
       <div id="shopList"></div>
+      <div class="card" id="helperRarityList" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -473,18 +509,25 @@
     ];
 
     const shopItems = [
-      { id: "speed", name: "Rocket Sneakers", cost: 12, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
-      { id: "mult", name: "Grease Booster", cost: 20, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
-      { id: "spawn", name: "Snack Magnet", cost: 28, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
-      { id: "coin", name: "Golden Whiskers", cost: 25, desc: "+1 coin per food", apply: s => s.coinBoost += 1 },
-      { id: "armor", name: "Cheese Armor", cost: 34, desc: "+10 max HP", apply: s => { s.maxHp += 10; s.hp = Math.min(s.maxHp, s.hp + 8); } },
-      { id: "regen", name: "Regeneration Soda", cost: 45, desc: "+0.12 HP regen", apply: s => s.hpRegen += 0.12 },
-      { id: "damage", name: "Spicy Bite", cost: 38, desc: "+1 rat damage", apply: s => s.damage += 1 },
-      { id: "vacuum", name: "Vacuum Belly", cost: 50, desc: "+4 pickup hitbox", apply: s => s.hitboxBonus += 4 },
-      { id: "fangs", name: "Steel Fangs", cost: 56, desc: "+2 attack", apply: s => s.damage += 2 },
-      { id: "shell", name: "Titan Shell", cost: 62, desc: "+2 defense", apply: s => s.defense += 2 },
-      { id: "vital", name: "Giga Vitamins", cost: 60, desc: "+18 max HP", apply: s => { s.maxHp += 18; s.hp = Math.min(s.maxHp, s.hp + 12); } },
-      { id: "helper", name: "Rat Whistle", cost: 95, desc: "+1 helper rat (max 5)", apply: s => s.helperCount = Math.min(5, s.helperCount + 1) }
+      { id: "speed", name: "Rocket Sneakers", cost: 12, max: 15, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
+      { id: "mult", name: "Grease Booster", cost: 20, max: 20, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
+      { id: "spawn", name: "Snack Magnet", cost: 28, max: 10, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
+      { id: "coin", name: "Golden Whiskers", cost: 25, max: 15, desc: "+1 coin per food", apply: s => s.coinBoost += 1 },
+      { id: "armor", name: "Cheese Armor", cost: 34, max: 18, desc: "+10 max HP", apply: s => { s.maxHp += 10; s.hp = Math.min(s.maxHp, s.hp + 8); } },
+      { id: "regen", name: "Regeneration Soda", cost: 45, max: 18, desc: "+0.12 HP regen", apply: s => s.hpRegen += 0.12 },
+      { id: "damage", name: "Spicy Bite", cost: 38, max: 20, desc: "+1 rat damage", apply: s => s.damage += 1 },
+      { id: "vacuum", name: "Vacuum Belly", cost: 50, max: 15, desc: "+4 pickup hitbox", apply: s => s.hitboxBonus += 4 },
+      { id: "fangs", name: "Steel Fangs", cost: 56, max: 12, desc: "+2 attack", apply: s => s.damage += 2 },
+      { id: "shell", name: "Titan Shell", cost: 62, max: 15, desc: "+2 defense", apply: s => s.defense += 2 },
+      { id: "vital", name: "Giga Vitamins", cost: 60, max: 12, desc: "+18 max HP", apply: s => { s.maxHp += 18; s.hp = Math.min(s.maxHp, s.hp + 12); } },
+      { id: "helper", name: "Rat Whistle", cost: 95, max: 5, desc: "Roll helper rat (max 5)", apply: s => addHelperFromRoll() }
+    ];
+
+    const helperRarityTable = [
+      { type: "Brawler Rat", rarity: "Common", chance: 50, attack: 1.8, range: 96, style: "melee", icon: "🥊" },
+      { type: "Sword Rat", rarity: "Rare", chance: 28, attack: 3.2, range: 108, style: "melee", icon: "🗡️" },
+      { type: "Shooter Rat", rarity: "Epic", chance: 16, attack: 2.7, range: 190, style: "ranged", icon: "🔫" },
+      { type: "Sniper Rat", rarity: "Legendary", chance: 6, attack: 5, range: 250, style: "ranged", icon: "🎯" }
     ];
 
     const gameModes = [
@@ -542,9 +585,12 @@
       helperCount: 0,
       helperAttack: 1.4,
       helperRats: [],
+      helperInventory: [],
+      boostPurchases: {},
       hitboxBonus: 0,
       wave: 1,
       enemies: [],
+      enemyBullets: [],
       pickups: [],
       lastEnemySpawn: 0,
       lastPickupSpawn: 0,
@@ -582,6 +628,8 @@
     const modesList = document.getElementById("modesList");
     const leaderboardList = document.getElementById("leaderboardList");
     const myRankText = document.getElementById("myRankText");
+    const wavePopup = document.getElementById("wavePopup");
+    const helperRarityList = document.getElementById("helperRarityList");
     localStorage.setItem("fatRatPlayerId", state.playerId);
 
     function currentZone() { return zones[state.zoneIndex]; }
@@ -668,12 +716,23 @@
       return "";
     }
 
+    function renderHelperRarityList() {
+      const counts = state.helperInventory.reduce((acc, helper) => {
+        acc[helper.rarity] = (acc[helper.rarity] || 0) + 1;
+        return acc;
+      }, {});
+      helperRarityList.innerHTML = `<strong>🎲 Helper Rat Rarity List</strong><div style="margin-top:6px;color:var(--muted)">Buying Rat Whistle rolls one helper type.</div>` +
+        helperRarityTable.map(h => `<div style="margin-top:6px">${h.icon} <strong>${h.type}</strong> • ${h.rarity} • ${h.chance}% • ATK ${h.attack} • ${h.style === "ranged" ? `Range ${h.range}` : `Melee ${h.range}px`} • Owned: ${counts[h.rarity] || 0}</div>`).join("");
+    }
+
     function renderShop() {
       shopList.innerHTML = "";
       shopItems.forEach(item => {
         const card = document.createElement("div");
         card.className = "card";
-        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins each</div></div><div><input class="small-input" type="number" min="1" value="1" data-qty="${item.id}" /><button class="ios-btn" data-buy="${item.id}" data-amount="1" ${state.coins >= item.cost ? "" : "disabled"}>Buy 1</button><button class="ios-btn secondary" data-buy="${item.id}" data-amount="custom">Buy x</button></div></div>`;
+        const bought = state.boostPurchases[item.id] || 0;
+        const atCap = item.max && bought >= item.max;
+        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins each • ${bought}/${item.max || "∞"}</div></div><div><input class="small-input" type="number" min="1" value="1" data-qty="${item.id}" /><button class="ios-btn" data-buy="${item.id}" data-amount="1" ${(state.coins >= item.cost && !atCap) ? "" : "disabled"}>Buy 1</button><button class="ios-btn secondary" data-buy="${item.id}" data-amount="custom" ${atCap ? "disabled" : ""}>Buy x</button></div></div>`;
         shopList.appendChild(card);
       });
     }
@@ -942,6 +1001,31 @@
       myRankText.textContent = myRank ? `Your place: #${myRank} with ${state.totalFatEarned} fat${errorText}` : `Play to get ranked.${errorText}`;
     }
 
+    function rollHelperType() {
+      const roll = Math.random() * 100;
+      let sum = 0;
+      for (const helper of helperRarityTable) {
+        sum += helper.chance;
+        if (roll <= sum) return helper;
+      }
+      return helperRarityTable[0];
+    }
+
+    function addHelperFromRoll() {
+      if (state.helperCount >= 5) return;
+      const helper = rollHelperType();
+      state.helperInventory.push({ ...helper, id: `h-${Math.random().toString(36).slice(2)}` });
+      state.helperCount = Math.min(5, state.helperInventory.length);
+      setStatus(`Rolled ${helper.rarity} ${helper.type} ${helper.icon}!`, "#a7f3d0");
+    }
+
+    function showWavePopup(text) {
+      wavePopup.textContent = text;
+      wavePopup.classList.add("show");
+      clearTimeout(showWavePopup.timer);
+      showWavePopup.timer = setTimeout(() => wavePopup.classList.remove("show"), 2200);
+    }
+
     function buyItem(id, amount = 1) {
       const item = shopItems.find(i => i.id === id);
       if (!item) return;
@@ -951,10 +1035,23 @@
         setStatus(`Need ${total} coins for ${count}x ${item.name}`, "#fca5a5");
         return;
       }
-      state.coins -= total;
-      for (let i = 0; i < count; i++) item.apply(state);
+      const already = state.boostPurchases[id] || 0;
+      const allowed = item.max ? Math.max(0, item.max - already) : count;
+      if (allowed <= 0) {
+        setStatus(`${item.name} is already maxed!`, "#fca5a5");
+        return;
+      }
+      const finalCount = Math.min(count, allowed);
+      const finalTotal = item.cost * finalCount;
+      if (state.coins < finalTotal) {
+        setStatus(`Need ${finalTotal} coins for ${finalCount}x ${item.name}`, "#fca5a5");
+        return;
+      }
+      state.coins -= finalTotal;
+      for (let i = 0; i < finalCount; i++) item.apply(state);
+      state.boostPurchases[id] = already + finalCount;
       state.uiDirty = true;
-      setStatus(`Bought ${count}x ${item.name}!`, "#86efac");
+      setStatus(`Bought ${finalCount}x ${item.name}!`, "#86efac");
     }
 
     function buyPcAccessory(id) {
@@ -1001,13 +1098,24 @@
       bandit: { name: "Rat Bandit", hp: 50, speed: 1.8, damage: 4, defense: 0, badge: "🗡️", primary: "#fca5a5", secondary: "#b91c1c" },
       shooter: { name: "Rat Shooter", hp: 150, speed: 1.1, damage: 5, defense: 10, range: 220, fireRate: 900, badge: "🔫", primary: "#93c5fd", secondary: "#1d4ed8" },
       fast: { name: "Fast Rat", hp: 25, speed: 3.6, damage: 3, defense: 0, badge: "⚡", primary: "#fef08a", secondary: "#ca8a04" },
-      king: { name: "KING RAT 👑", hp: 1000, speed: 0.6, damage: 12, defense: 20, boss: true, badge: "👑", primary: "#e9d5ff", secondary: "#6d28d9" }
+      king: { name: "KING RAT 👑", hp: 1000, speed: 0.6, damage: 12, defense: 20, boss: true, badge: "👑", primary: "#e9d5ff", secondary: "#6d28d9" },
+      bruiser: { name: "Brute Rat", hp: 260, speed: 1.05, damage: 11, defense: 12, badge: "🪓", primary: "#fdba74", secondary: "#c2410c" },
+      shadow: { name: "Shadow Rat", hp: 120, speed: 3.9, damage: 9, defense: 4, badge: "🌑", primary: "#a5b4fc", secondary: "#312e81" },
+      pyro: { name: "Pyro Rat", hp: 180, speed: 1.9, damage: 10, defense: 6, range: 240, fireRate: 700, badge: "🔥", primary: "#fda4af", secondary: "#b91c1c" }
     };
 
     function pickEnemyType() {
       if (state.modeEnemyMultiplier > 1.45 && Math.random() < 0.18) return "king";
       if (state.wave % 10 === 0 && !state.bossEnemyId) return "king";
       const roll = Math.random();
+      if (state.wave >= 10) {
+        if (roll < 0.25) return "bandit";
+        if (roll < 0.45) return "fast";
+        if (roll < 0.62) return "shooter";
+        if (roll < 0.78) return "shadow";
+        if (roll < 0.9) return "bruiser";
+        return "pyro";
+      }
       if (roll < 0.5) return "bandit";
       if (roll < 0.78) return "fast";
       return "shooter";
@@ -1164,6 +1272,64 @@
       }
     }
 
+
+    function spawnEnemyBullet(enemy, ratCenterX, ratCenterY) {
+      const fromX = enemy.x + (enemy.boss ? 30 : 22);
+      const fromY = enemy.y + (enemy.boss ? 24 : 18);
+      const dirX = ratCenterX - fromX;
+      const dirY = ratCenterY - fromY;
+      const dist = Math.hypot(dirX, dirY) || 1;
+      const speed = enemy.boss ? 5.2 : 4.2;
+      const bullet = {
+        id: `bullet-${Math.random().toString(36).slice(2)}`,
+        x: fromX,
+        y: fromY,
+        vx: (dirX / dist) * speed,
+        vy: (dirY / dist) * speed,
+        damage: enemy.damage,
+        life: enemy.boss ? 2400 : 1800
+      };
+      state.enemyBullets.push(bullet);
+      const el = document.createElement("div");
+      el.id = bullet.id;
+      el.className = "enemy-bullet";
+      el.style.left = `${bullet.x}px`;
+      el.style.top = `${bullet.y}px`;
+      gameArea.appendChild(el);
+    }
+
+    function updateEnemyBullets(dtMs) {
+      const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
+      state.enemyBullets = state.enemyBullets.filter(bullet => {
+        bullet.x += bullet.vx;
+        bullet.y += bullet.vy;
+        bullet.life -= dtMs;
+
+        const out = bullet.x < -20 || bullet.y < -20 || bullet.x > gameArea.clientWidth + 20 || bullet.y > gameArea.clientHeight + 20 || bullet.life <= 0;
+        const bulletBox = { x: bullet.x, y: bullet.y, w: 14, h: 14 };
+        const hitRat = intersects(ratBox, bulletBox);
+
+        const el = document.getElementById(bullet.id);
+        if (el) {
+          el.style.left = `${bullet.x}px`;
+          el.style.top = `${bullet.y}px`;
+        }
+
+        if (hitRat) {
+          state.hp -= Math.max(0.5, bullet.damage - getPlayerDefense() * 0.5);
+          el?.remove();
+          return false;
+        }
+
+        if (out) {
+          el?.remove();
+          return false;
+        }
+
+        return true;
+      });
+    }
+
     function updateEnemies(ts) {
       const ratCenterX = state.rat.x + state.rat.w / 2;
       const ratCenterY = state.rat.y + state.rat.h / 2;
@@ -1174,7 +1340,7 @@
 
         if (enemy.type === "shooter" && dist < enemy.range) {
           if (ts - enemy.lastShot > enemy.fireRate) {
-            state.hp -= Math.max(0.5, enemy.damage * 0.7 - getPlayerDefense() * 0.5);
+            spawnEnemyBullet(enemy, ratCenterX, ratCenterY);
             enemy.lastShot = ts;
           }
         } else {
@@ -1215,6 +1381,8 @@
         state.wave = Math.max(1, state.wave - 1);
         state.fat = Math.max(0, state.fat - 30);
         state.combo = 1;
+        state.enemyBullets.forEach(b => document.getElementById(b.id)?.remove());
+        state.enemyBullets = [];
         setStatus("You got bonked! Respawned with HP reset.", "#fca5a5");
       }
     }
@@ -1245,6 +1413,7 @@
       ensureHelperRats();
       const aliveEnemies = state.enemies.filter(e => e.hp > 0);
       state.helperRats.forEach((helper, idx) => {
+        const helperMeta = state.helperInventory[idx] || helperRarityTable[0];
         helper.swing += 0.08 + idx * 0.005;
         const orbit = 42 + idx * 8;
         helper.x += ((state.rat.x + Math.cos(helper.swing) * orbit) - helper.x) * 0.2;
@@ -1262,8 +1431,9 @@
           if (d < best) { best = d; target = enemy; }
         });
 
-        if (target && best < 96) {
-          damageEnemy(target, state.helperAttack + getPlayerAttack() * 0.18);
+        if (target && best < (helperMeta.range || 96)) {
+          const damage = helperMeta.attack + state.helperAttack + getPlayerAttack() * (helperMeta.style === "ranged" ? 0.13 : 0.18);
+          damageEnemy(target, damage);
           if (el) {
             el.style.transform = "scale(1.16) translateY(-2px)";
             setTimeout(() => {
@@ -1293,11 +1463,14 @@
       renderZones();
       renderPcShop();
       renderModes();
+      renderHelperRarityList();
       renderLeaderboard();
       state.uiDirty = false;
     }
 
     function gameLoop(ts) {
+      const dt = Math.min(50, ts - (state.lastFrameTs || ts));
+      state.lastFrameTs = ts;
       const spawnEvery = Math.max(170, (currentZone().foodRate - state.spawnBoost) * state.modeSpawnMultiplier);
       if (ts - state.lastSpawn > spawnEvery && state.foods.length < 26) {
         spawnFood();
@@ -1320,7 +1493,13 @@
       if (state.totalFatEarned > state.wave * 120) {
         state.wave += 1;
         state.uiDirty = true;
-        setStatus(`Wave ${state.wave} started!`, "#93c5fd");
+        if (state.wave === 10) {
+          showWavePopup("WAVE 10 started... new enemies added.");
+          setStatus("Hard mode enemies unlocked!", "#fca5a5");
+        } else {
+          showWavePopup(`WAVE ${state.wave} started!`);
+          setStatus(`Wave ${state.wave} started!`, "#93c5fd");
+        }
       }
 
       updateRat();
@@ -1328,6 +1507,7 @@
       collectPickups();
       updateHelperRats(ts);
       updateEnemies(ts);
+      updateEnemyBullets(dt);
       maybeAutoUnlockAndTravel();
 
       if (state.uiDirty) renderAll();
