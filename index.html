@@ -370,6 +370,34 @@
 
     .pad-btn.empty { visibility: hidden; }
 
+    .pad-btn { position: relative; }
+    .pad-btn.active {
+      transform: translateY(1px) scale(.98);
+      filter: brightness(1.08);
+    }
+    .pad-btn .arrow {
+      display: inline-block;
+      width: 0;
+      height: 0;
+      border-style: solid;
+    }
+    .pad-btn .arrow.up {
+      border-width: 0 11px 16px 11px;
+      border-color: transparent transparent rgba(255,255,255,.95) transparent;
+    }
+    .pad-btn .arrow.down {
+      border-width: 16px 11px 0 11px;
+      border-color: rgba(255,255,255,.95) transparent transparent transparent;
+    }
+    .pad-btn .arrow.left {
+      border-width: 11px 16px 11px 0;
+      border-color: transparent rgba(255,255,255,.95) transparent transparent;
+    }
+    .pad-btn .arrow.right {
+      border-width: 11px 0 11px 16px;
+      border-color: transparent transparent transparent rgba(255,255,255,.95);
+    }
+
     .mode-chip {
       display: inline-block;
       padding: 6px 10px;
@@ -496,12 +524,12 @@
   </div>
 
   <div class="mobile-controls" id="mobileControls" aria-label="Touch controls">
-    <button class="pad-btn empty" tabindex="-1">•</button>
-    <button class="pad-btn" data-touch="up">⬆️</button>
-    <button class="pad-btn empty" tabindex="-1">•</button>
-    <button class="pad-btn" data-touch="left">⬅️</button>
-    <button class="pad-btn" data-touch="down">⬇️</button>
-    <button class="pad-btn" data-touch="right">➡️</button>
+    <button class="pad-btn empty" tabindex="-1" aria-hidden="true"></button>
+    <button class="pad-btn" data-touch="up" aria-label="Move up"><span class="arrow up"></span></button>
+    <button class="pad-btn empty" tabindex="-1" aria-hidden="true"></button>
+    <button class="pad-btn" data-touch="left" aria-label="Move left"><span class="arrow left"></span></button>
+    <button class="pad-btn" data-touch="down" aria-label="Move down"><span class="arrow down"></span></button>
+    <button class="pad-btn" data-touch="right" aria-label="Move right"><span class="arrow right"></span></button>
   </div>
 
   <script>
@@ -523,21 +551,22 @@
     ];
 
     const shopItems = [
-      { id: "speed", name: "Rocket Sneakers", cost: 12, max: 10, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
-      { id: "mult", name: "Grease Booster", cost: 20, max: 35, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
+      { id: "speed", name: "Rocket Sneakers", cost: 12, max: 10, desc: "+1.1 movement speed", apply: s => s.speed += 1.1 },
+      { id: "mult", name: "Grease Booster", cost: 20, max: 35, desc: "+1.3 fat per bite", apply: s => s.fatPerFood += 1.3 },
       { id: "burner", name: "Fat Burner", cost: 52, max: 12, desc: "Slows rat growth and shrinks current fat", apply: s => { s.fatBurnerLevel += 1; s.fat = Math.max(0, Math.floor(s.fat * 0.92)); } },
       { id: "ultraburn", name: "Ultra Fat Shrinker", cost: 600, max: 1, desc: "Turns rat tiny and stops fat growth forever", apply: s => { s.ultraShrinkerActive = true; s.fat = 0; s.hitboxBonus = 0; setStatus("Ultra Fat Shrinker active: tiny mode locked.", "#67e8f9"); } },
-      { id: "spawn", name: "Snack Magnet", cost: 28, max: 10, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
-      { id: "coin", name: "Golden Whiskers", cost: 25, max: 10, desc: "+1 coin per food", apply: s => s.coinBoost += 1 },
-      { id: "armor", name: "Cheese Armor", cost: 34, max: 18, desc: "+10 max HP", apply: s => { s.maxHp += 10; s.hp = Math.min(s.maxHp, s.hp + 8); } },
-      { id: "regen", name: "Regeneration Soda", cost: 45, max: 18, desc: "+0.12 HP regen", apply: s => s.hpRegen += 0.12 },
-      { id: "damage", name: "Spicy Bite", cost: 38, max: 20, desc: "+1 rat damage", apply: s => s.damage += 1 },
+      { id: "spawn", name: "Snack Magnet", cost: 28, max: 10, desc: "Faster food spawns (+200 rate)", apply: s => s.spawnBoost += 200 },
+      { id: "coin", name: "Golden Whiskers", cost: 25, max: 10, desc: "+2 coins per food", apply: s => s.coinBoost += 2 },
+      { id: "armor", name: "Cheese Armor", cost: 34, max: 18, desc: "+14 max HP", apply: s => { s.maxHp += 14; s.hp = Math.min(s.maxHp, s.hp + 10); } },
+      { id: "regen", name: "Regeneration Soda", cost: 45, max: 18, desc: "+0.16 HP regen", apply: s => s.hpRegen += 0.16 },
+      { id: "damage", name: "Spicy Bite", cost: 38, max: 20, desc: "+2 rat damage", apply: s => s.damage += 2 },
       { id: "vacuum", name: "Vacuum Belly", cost: 50, max: 15, desc: "+4 pickup hitbox", apply: s => s.hitboxBonus += 4 },
       { id: "fangs", name: "Steel Fangs", cost: 56, max: 12, desc: "+2 attack", apply: s => s.damage += 2 },
-      { id: "shell", name: "Titan Shell", cost: 62, max: 15, desc: "+2 defense", apply: s => s.defense += 2 },
-      { id: "vital", name: "Giga Vitamins", cost: 60, max: 12, desc: "+18 max HP", apply: s => { s.maxHp += 18; s.hp = Math.min(s.maxHp, s.hp + 12); } },
+      { id: "shell", name: "Titan Shell", cost: 62, max: 15, desc: "+3 defense", apply: s => s.defense += 3 },
+      { id: "vital", name: "Giga Vitamins", cost: 60, max: 12, desc: "+24 max HP", apply: s => { s.maxHp += 24; s.hp = Math.min(s.maxHp, s.hp + 15); } },
       { id: "helper", name: "Rat Whistle", cost: 95, max: 5, desc: "Roll helper rat (max 5)", apply: s => addHelperFromRoll() },
-      { id: "defpierce", name: "Defense Piercer", cost: 300, max: 10, desc: "+50 defense pierce", apply: s => s.playerDefensePierce += 50 }
+      { id: "defpierce", name: "Defense Piercer", cost: 300, max: 10, desc: "+65 defense pierce", apply: s => s.playerDefensePierce += 65 },
+      { id: "wavecap", name: "Wave Cap Amplifier", cost: 1000, max: 10, desc: "+1 extra wave-based cap step (except speed/fat)", apply: s => s.waveCapAmplifier += 1 }
     ];
 
     const helperRarityTable = [
@@ -627,6 +656,7 @@
       slowedUntil: 0,
       vulnUntil: 0,
       playerDefensePierce: 0,
+      waveCapAmplifier: 0,
       bossMilestoneSpawned: {},
       lunaticSpawned: false,
       pylons: [],
@@ -761,7 +791,10 @@
 
 
     function getBoostMax(item) {
-      return item.max + Math.floor(state.wave / 10) * 25;
+      if (item.id === "speed") return item.max;
+      if (item.id === "mult") return item.max;
+      const waveTier = Math.floor(state.wave / 10);
+      return item.max + waveTier * (25 + state.waveCapAmplifier);
     }
 
     function renderShop() {
@@ -1744,8 +1777,8 @@
 
     function startWave(wave) {
       state.waveStarted = true;
-      const baseCount = 4 + wave * 2;
-      state.waveSpawnLeft = wave >= 20 ? baseCount + 10 : wave >= 15 ? baseCount + 6 : wave >= 10 ? baseCount + 3 : baseCount;
+      const baseCount = 3 + Math.floor(wave * 1.7);
+      state.waveSpawnLeft = wave >= 20 ? baseCount + 8 : wave >= 15 ? baseCount + 5 : wave >= 10 ? baseCount + 2 : baseCount;
       state.waveSpawnTick = 0;
       if (wave === 130) {
         showWavePopup("LUNATIC RAT HAS SPAWNED ! 500k hp ");
@@ -1785,8 +1818,8 @@
       }
 
       const bossAlive = state.enemies.some(enemy => enemy.boss);
-      const maxAlive = Math.min(6 + Math.floor(state.wave * 0.8), 34);
-      const enemySpawnEvery = Math.max(620, 2350 - state.wave * 14);
+      const maxAlive = Math.min(6 + Math.floor(state.wave * 0.72), 30);
+      const enemySpawnEvery = Math.max(380, 1600 - state.wave * 8);
       if (!bossAlive && state.waveSpawnLeft > 0 && ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < maxAlive) {
         spawnEnemy();
         state.waveSpawnLeft -= 1;
@@ -1897,22 +1930,39 @@
     });
 
     const mobileControls = document.getElementById("mobileControls");
+    const resetTouchControls = () => {
+      Object.keys(state.touch).forEach(k => state.touch[k] = false);
+      mobileControls.querySelectorAll("[data-touch]").forEach(b => b.classList.remove("active"));
+    };
     mobileControls.querySelectorAll("[data-touch]").forEach(btn => {
       const dir = btn.dataset.touch;
       const down = event => {
         event.preventDefault();
+        btn.classList.add("active");
         state.touch[dir] = true;
+        if (btn.setPointerCapture && event.pointerId !== undefined) {
+          try { btn.setPointerCapture(event.pointerId); } catch (_) {}
+        }
       };
       const up = event => {
         event.preventDefault();
+        btn.classList.remove("active");
         state.touch[dir] = false;
       };
       btn.addEventListener("pointerdown", down);
       btn.addEventListener("pointerup", up);
       btn.addEventListener("pointerleave", up);
       btn.addEventListener("pointercancel", up);
+      btn.addEventListener("lostpointercapture", up);
+      btn.addEventListener("touchstart", down, { passive: false });
+      btn.addEventListener("touchend", up, { passive: false });
+      btn.addEventListener("touchcancel", up, { passive: false });
     });
 
+    window.addEventListener("blur", resetTouchControls);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) resetTouchControls();
+    });
     window.addEventListener("resize", clampRat);
 
     async function initializeLeaderboardOnJoin() {
