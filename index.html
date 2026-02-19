@@ -598,6 +598,10 @@
       pcEquipped: {},
       pcFatBonus: 0,
       bossEnemyId: null,
+      wave20BossSpawned: false,
+      regenBlockedUntil: 0,
+      slowedUntil: 0,
+      vulnUntil: 0,
       touch: { up: false, down: false, left: false, right: false },
       playerId: localStorage.getItem("fatRatPlayerId") || crypto.randomUUID(),
       remoteBoard: [],
@@ -683,7 +687,7 @@
       modeStat.textContent = gameModes.find(m => m.id === state.currentMode)?.name || "Classic";
       comboStat.textContent = `x${state.combo.toFixed(1)}`;
       state.hp = Math.min(state.hp, getPlayerMaxHp());
-      hpStat.textContent = `${Math.round(state.hp)}/${Math.round(getPlayerMaxHp())}`;
+      hpStat.textContent = `${Math.round(state.hp)}/${Math.round(getPlayerMaxHp())}${Date.now() < state.regenBlockedUntil ? " 🚫Regen" : ""}${Date.now() < state.slowedUntil ? " 🧊Slow" : ""}`;
       waveStat.textContent = state.wave;
       helperStat.textContent = state.helperCount;
       gameArea.style.background = currentZone().bg;
@@ -1101,13 +1105,33 @@
       king: { name: "KING RAT 👑", hp: 1000, speed: 0.6, damage: 12, defense: 20, boss: true, badge: "👑", primary: "#e9d5ff", secondary: "#6d28d9" },
       bruiser: { name: "Brute Rat", hp: 260, speed: 1.05, damage: 11, defense: 12, badge: "🪓", primary: "#fdba74", secondary: "#c2410c" },
       shadow: { name: "Shadow Rat", hp: 120, speed: 3.9, damage: 9, defense: 4, badge: "🌑", primary: "#a5b4fc", secondary: "#312e81" },
-      pyro: { name: "Pyro Rat", hp: 180, speed: 1.9, damage: 10, defense: 6, range: 240, fireRate: 700, badge: "🔥", primary: "#fda4af", secondary: "#b91c1c" }
+      pyro: { name: "Pyro Rat", hp: 180, speed: 1.9, damage: 10, defense: 6, range: 240, fireRate: 700, defensePierce: 3, debuff: "noregen", badge: "🔥", primary: "#fda4af", secondary: "#b91c1c" },
+      assassin: { name: "Assassin Rat", hp: 420, speed: 4.6, damage: 18, defense: 20, defensePierce: 12, debuff: "slow", badge: "🩸", primary: "#c4b5fd", secondary: "#4c1d95" },
+      juggernaut: { name: "Juggernaut Rat", hp: 2400, speed: 0.95, damage: 30, defense: 65, defensePierce: 20, debuff: "noregen", badge: "🛡️", primary: "#fdba74", secondary: "#7c2d12" },
+      void: { name: "Void Rat", hp: 1800, speed: 2.5, damage: 25, defense: 40, range: 280, fireRate: 520, defensePierce: 18, debuff: "vuln", badge: "🕳️", primary: "#93c5fd", secondary: "#1e3a8a" },
+      apex: { name: "APEX TITAN RAT ☠️", hp: 50000, speed: 1.2, damage: 65, defense: 300, boss: true, range: 360, fireRate: 420, defensePierce: 180, debuff: "noregen", ultraRate: 6000, badge: "☠️", primary: "#fecaca", secondary: "#7f1d1d" }
     };
 
     function pickEnemyType() {
+      if (state.wave >= 20 && !state.wave20BossSpawned) return "apex";
       if (state.modeEnemyMultiplier > 1.45 && Math.random() < 0.18) return "king";
-      if (state.wave % 10 === 0 && !state.bossEnemyId) return "king";
+      if (state.wave % 10 === 0 && !state.bossEnemyId && state.wave < 20) return "king";
       const roll = Math.random();
+      if (state.wave >= 20) {
+        if (roll < 0.18) return "void";
+        if (roll < 0.35) return "juggernaut";
+        if (roll < 0.55) return "assassin";
+        if (roll < 0.72) return "pyro";
+        if (roll < 0.86) return "shooter";
+        return "shadow";
+      }
+      if (state.wave >= 15) {
+        if (roll < 0.22) return "bruiser";
+        if (roll < 0.4) return "assassin";
+        if (roll < 0.6) return "pyro";
+        if (roll < 0.78) return "shadow";
+        return "shooter";
+      }
       if (state.wave >= 10) {
         if (roll < 0.25) return "bandit";
         if (roll < 0.45) return "fast";
@@ -1131,7 +1155,7 @@
       bossHpWrap.style.display = "block";
       const ratio = Math.max(0, boss.hp / boss.maxHp);
       bossHpFill.style.width = `${(ratio * 100).toFixed(1)}%`;
-      bossHpLabel.textContent = `KING RAT 👑 ${Math.max(0, Math.ceil(boss.hp))}/${boss.maxHp} HP`;
+      bossHpLabel.textContent = `${boss.name} ${Math.max(0, Math.ceil(boss.hp))}/${boss.maxHp} HP`;
     }
 
     function damageEnemy(enemy, amount) {
@@ -1162,7 +1186,11 @@
         defense: type.defense || 0,
         range: type.range || 0,
         fireRate: type.fireRate || 0,
+        ultraRate: type.ultraRate || 0,
         lastShot: 0,
+        lastUltra: 0,
+        defensePierce: type.defensePierce || 0,
+        debuff: type.debuff || "",
         boss: !!type.boss,
         wasDamaged: false,
         name: type.name,
@@ -1171,6 +1199,7 @@
         secondary: type.secondary || "#7c3aed"
       };
       if (enemy.boss) state.bossEnemyId = enemy.id;
+      if (enemy.type === "apex") state.wave20BossSpawned = true;
       state.enemies.push(enemy);
       const el = document.createElement("div");
       el.id = enemy.id;
@@ -1238,7 +1267,8 @@
     }
 
     function updateRat() {
-      const moveSpeed = state.speed + (state.currentMode === "rush" ? 0.9 : 0) + (state.pcEquipped.keyboard ? 0.5 : 0);
+      const baseMoveSpeed = state.speed + (state.currentMode === "rush" ? 0.9 : 0) + (state.pcEquipped.keyboard ? 0.5 : 0);
+      const moveSpeed = Date.now() < state.slowedUntil ? baseMoveSpeed * 0.68 : baseMoveSpeed;
       if (state.keys.ArrowUp || state.keys.w || state.touch.up) state.rat.y -= moveSpeed;
       if (state.keys.ArrowDown || state.keys.s || state.touch.down) state.rat.y += moveSpeed;
       if (state.keys.ArrowLeft || state.keys.a || state.touch.left) state.rat.x -= moveSpeed;
@@ -1273,26 +1303,46 @@
     }
 
 
-    function spawnEnemyBullet(enemy, ratCenterX, ratCenterY) {
+    function applyEnemyDebuff(enemy) {
+      const now = Date.now();
+      if (enemy.debuff === "noregen") state.regenBlockedUntil = Math.max(state.regenBlockedUntil, now + 3200);
+      if (enemy.debuff === "slow") state.slowedUntil = Math.max(state.slowedUntil, now + 2400);
+      if (enemy.debuff === "vuln") state.vulnUntil = Math.max(state.vulnUntil, now + 3000);
+    }
+
+    function dealDamageToPlayer(enemy, rawDamage) {
+      const effectiveDefense = Math.max(0, getPlayerDefense() - (enemy.defensePierce || 0));
+      const damage = Math.max(0.5, rawDamage - effectiveDefense * 0.5);
+      const vulnMultiplier = Date.now() < state.vulnUntil ? 1.28 : 1;
+      state.hp -= damage * vulnMultiplier;
+      applyEnemyDebuff(enemy);
+    }
+
+    function spawnEnemyBullet(enemy, ratCenterX, ratCenterY, override = {}) {
       const fromX = enemy.x + (enemy.boss ? 30 : 22);
       const fromY = enemy.y + (enemy.boss ? 24 : 18);
       const dirX = ratCenterX - fromX;
       const dirY = ratCenterY - fromY;
       const dist = Math.hypot(dirX, dirY) || 1;
-      const speed = enemy.boss ? 5.2 : 4.2;
+      const speed = override.speed || (enemy.boss ? 5.2 : 4.2);
       const bullet = {
         id: `bullet-${Math.random().toString(36).slice(2)}`,
         x: fromX,
         y: fromY,
         vx: (dirX / dist) * speed,
         vy: (dirY / dist) * speed,
-        damage: enemy.damage,
-        life: enemy.boss ? 2400 : 1800
+        damage: override.damage || enemy.damage,
+        defensePierce: override.defensePierce ?? enemy.defensePierce ?? 0,
+        debuff: override.debuff || enemy.debuff || "",
+        life: override.life || (enemy.boss ? 2400 : 1800),
+        size: override.size || 14
       };
       state.enemyBullets.push(bullet);
       const el = document.createElement("div");
       el.id = bullet.id;
       el.className = "enemy-bullet";
+      el.style.width = `${bullet.size}px`;
+      el.style.height = `${bullet.size}px`;
       el.style.left = `${bullet.x}px`;
       el.style.top = `${bullet.y}px`;
       gameArea.appendChild(el);
@@ -1306,7 +1356,7 @@
         bullet.life -= dtMs;
 
         const out = bullet.x < -20 || bullet.y < -20 || bullet.x > gameArea.clientWidth + 20 || bullet.y > gameArea.clientHeight + 20 || bullet.life <= 0;
-        const bulletBox = { x: bullet.x, y: bullet.y, w: 14, h: 14 };
+        const bulletBox = { x: bullet.x, y: bullet.y, w: bullet.size, h: bullet.size };
         const hitRat = intersects(ratBox, bulletBox);
 
         const el = document.getElementById(bullet.id);
@@ -1316,7 +1366,7 @@
         }
 
         if (hitRat) {
-          state.hp -= Math.max(0.5, bullet.damage - getPlayerDefense() * 0.5);
+          dealDamageToPlayer(bullet, bullet.damage);
           el?.remove();
           return false;
         }
@@ -1338,10 +1388,21 @@
         const dy = ratCenterY - enemy.y;
         const dist = Math.hypot(dx, dy) || 1;
 
-        if (enemy.type === "shooter" && dist < enemy.range) {
+        if (enemy.range && dist < enemy.range) {
           if (ts - enemy.lastShot > enemy.fireRate) {
             spawnEnemyBullet(enemy, ratCenterX, ratCenterY);
             enemy.lastShot = ts;
+          }
+          if (enemy.ultraRate && ts - enemy.lastUltra > enemy.ultraRate) {
+            for (let i = 0; i < 14; i++) {
+              const angle = (Math.PI * 2 * i) / 14;
+              const targetX = enemy.x + Math.cos(angle) * 130;
+              const targetY = enemy.y + Math.sin(angle) * 130;
+              spawnEnemyBullet(enemy, targetX, targetY, { speed: 6.5, damage: enemy.damage * 1.8, size: 22, life: 2600, defensePierce: (enemy.defensePierce || 0) + 60, debuff: "noregen" });
+            }
+            if (dist < 240) dealDamageToPlayer(enemy, enemy.damage * 1.4);
+            enemy.lastUltra = ts;
+            showWavePopup("⚠️ APEX TITAN RAT used ULTRA ATTACK!");
           }
         } else {
           enemy.x += (dx / dist) * enemy.speed;
@@ -1359,7 +1420,7 @@
       state.enemies = state.enemies.filter(enemy => {
         const enemyBox = { x: enemy.x, y: enemy.y, w: enemy.boss ? 46 : 34, h: enemy.boss ? 46 : 34 };
         if (intersects(ratBox, enemyBox)) {
-          state.hp -= Math.max(0.2, enemy.damage * 0.04 - getPlayerDefense() * 0.5 * 0.04);
+          dealDamageToPlayer(enemy, enemy.damage * 0.04);
           damageEnemy(enemy, getPlayerAttack() * 0.65);
         }
         if (enemy.hp <= 0) {
@@ -1367,7 +1428,7 @@
           state.totalFatEarned += enemy.boss ? 80 : enemy.type === "shooter" ? 8 : 5;
           document.getElementById(enemy.id)?.remove();
           if (enemy.boss) {
-            setStatus("KING RAT defeated! 👑", "#fde68a");
+            setStatus(`${enemy.name} defeated!`, "#fde68a");
           }
           state.uiDirty = true;
           return false;
@@ -1489,11 +1550,15 @@
         state.lastPickupSpawn = ts;
       }
 
-      state.hp = Math.min(getPlayerMaxHp(), state.hp + getPlayerHpRegen());
+      const regenRate = Date.now() < state.regenBlockedUntil ? 0 : getPlayerHpRegen();
+      state.hp = Math.min(getPlayerMaxHp(), state.hp + regenRate);
       if (state.totalFatEarned > state.wave * 120) {
         state.wave += 1;
         state.uiDirty = true;
-        if (state.wave === 10) {
+        if (state.wave === 20) {
+          showWavePopup("WAVE 20 started... APEX TITAN RAT awakened!");
+          setStatus("Final boss incoming: 50,000 HP / 300 DEF", "#fca5a5");
+        } else if (state.wave === 10) {
           showWavePopup("WAVE 10 started... new enemies added.");
           setStatus("Hard mode enemies unlocked!", "#fca5a5");
         } else {
