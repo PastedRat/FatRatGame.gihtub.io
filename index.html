@@ -1818,8 +1818,8 @@
       }
 
       const bossAlive = state.enemies.some(enemy => enemy.boss);
-      const maxAlive = Math.min(6 + Math.floor(state.wave * 0.72), 30);
-      const enemySpawnEvery = Math.max(380, 1600 - state.wave * 8);
+      const maxAlive = Math.min(7 + Math.floor(state.wave * 0.82), 36);
+      const enemySpawnEvery = Math.max(240, 1200 - state.wave * 10);
       if (!bossAlive && state.waveSpawnLeft > 0 && ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < maxAlive) {
         spawnEnemy();
         state.waveSpawnLeft -= 1;
