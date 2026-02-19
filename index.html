@@ -441,6 +441,7 @@
       <button class="ios-btn secondary" id="openPcBtn">PC Accessories</button>
       <button class="ios-btn secondary" id="openLeaderboardBtn">World Leaderboard</button>
       <button class="ios-btn" id="openModesBtn">Game Modes</button>
+      <button class="ios-btn secondary" id="toggleMobSpawnBoostBtn">Mob Spawn Boost: OFF</button>
       <button class="ios-btn secondary" id="openDebugBtn">Debug</button>
     </div>
     <div class="pill">Move with WASD / Arrow Keys • Survive waves</div>
@@ -592,7 +593,8 @@
       { id: "vital", name: "Giga Vitamins", cost: 60, max: 12, desc: "+24 max HP", apply: s => { s.maxHp += 24; s.hp = Math.min(s.maxHp, s.hp + 15); } },
       { id: "helper", name: "Rat Whistle", cost: 95, max: 5, desc: "Roll helper rat (max 5)", apply: s => addHelperFromRoll() },
       { id: "defpierce", name: "Defense Piercer", cost: 300, max: 10, desc: "+65 defense pierce", apply: s => s.playerDefensePierce += 65 },
-      { id: "wavecap", name: "Wave Cap Amplifier", cost: 1000, max: 10, desc: "+1 extra wave-based cap step (except speed/fat)", apply: s => s.waveCapAmplifier += 1 }
+      { id: "wavecap", name: "Wave Cap Amplifier", cost: 1000, max: 10, desc: "+1 extra wave-based cap step (except speed/fat)", apply: s => s.waveCapAmplifier += 1 },
+      { id: "mobspawn", name: "+ Spawn Rate", cost: 320, max: 10, desc: "Mobs spawn faster (+stack, toggleable)", apply: s => s.mobSpawnBoostLevel += 1 }
     ];
 
     const helperRarityTable = [
@@ -686,6 +688,8 @@
       deaths: 0,
       debugUnlocked: false,
       debugNoCap: false,
+      mobSpawnBoostLevel: 0,
+      mobSpawnBoostEnabled: false,
       bossMilestoneSpawned: {},
       lunaticSpawned: false,
       pylons: [],
@@ -724,6 +728,7 @@
     const wavePopup = document.getElementById("wavePopup");
     const helperRarityList = document.getElementById("helperRarityList");
     const debugTools = document.getElementById("debugTools");
+    const toggleMobSpawnBoostBtn = document.getElementById("toggleMobSpawnBoostBtn");
     localStorage.setItem("fatRatPlayerId", state.playerId);
 
     function currentZone() { return zones[state.zoneIndex]; }
@@ -781,6 +786,7 @@
       waveStat.textContent = state.wave;
       helperStat.textContent = state.helperCount;
       deathStat.textContent = state.deaths;
+      toggleMobSpawnBoostBtn.textContent = `Mob Spawn Boost: ${state.mobSpawnBoostEnabled ? "ON" : "OFF"} (${state.mobSpawnBoostLevel}/10)`;
       gameArea.style.background = currentZone().bg;
 
       const burnerGrowthMul = state.ultraShrinkerActive ? 0 : Math.max(0.28, 1 - state.fatBurnerLevel * 0.07);
@@ -826,6 +832,7 @@
       if (state.debugNoCap) return Number.MAX_SAFE_INTEGER;
       if (item.id === "speed") return item.max;
       if (item.id === "mult") return item.max;
+      if (item.id === "mobspawn") return 10;
       const waveTier = Math.floor(state.wave / 10);
       return item.max + waveTier * (25 + state.waveCapAmplifier);
     }
@@ -1852,8 +1859,10 @@
       }
 
       const bossAlive = state.enemies.some(enemy => enemy.boss);
-      const maxAlive = Math.min(7 + Math.floor(state.wave * 0.82), 36);
-      const enemySpawnEvery = Math.max(240, 1200 - state.wave * 10);
+      const maxAlive = Math.min(8 + Math.floor(state.wave * 0.86), 40);
+      const baseEnemySpawnEvery = Math.max(170, 1160 - state.wave * 14);
+      const spawnBoostReduction = state.mobSpawnBoostEnabled ? state.mobSpawnBoostLevel * 45 : 0;
+      const enemySpawnEvery = Math.max(70, baseEnemySpawnEvery - spawnBoostReduction);
       if (!bossAlive && state.waveSpawnLeft > 0 && ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < maxAlive) {
         spawnEnemy();
         state.waveSpawnLeft -= 1;
@@ -1894,6 +1903,15 @@
     document.getElementById("openRatBtn").addEventListener("click", () => openModal("#ratModal"));
     document.getElementById("openPcBtn").addEventListener("click", () => openModal("#pcModal"));
     document.getElementById("openModesBtn").addEventListener("click", () => openModal("#modesModal"));
+    toggleMobSpawnBoostBtn.addEventListener("click", () => {
+      if (state.mobSpawnBoostLevel <= 0) {
+        setStatus("Buy + Spawn Rate in shop first.", "#fca5a5");
+        return;
+      }
+      state.mobSpawnBoostEnabled = !state.mobSpawnBoostEnabled;
+      setStatus(`Mob spawn boost ${state.mobSpawnBoostEnabled ? "enabled" : "disabled"}.`, "#93c5fd");
+      state.uiDirty = true;
+    });
     document.getElementById("openDebugBtn").addEventListener("click", () => openModal("#debugModal"));
 
     document.getElementById("unlockDebugBtn").addEventListener("click", () => {
