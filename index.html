@@ -214,6 +214,20 @@
       background: linear-gradient(90deg,#f97316,#ef4444);
     }
 
+    .pylon {
+      position: absolute;
+      width: 56px;
+      height: 76px;
+      border-radius: 14px;
+      border: 2px solid rgba(255,255,255,.35);
+      background: linear-gradient(180deg, var(--pylon-a,#7dd3fc), var(--pylon-b,#0c4a6e));
+      box-shadow: 0 0 20px rgba(125,211,252,.45);
+      pointer-events: none;
+      z-index: 7;
+    }
+
+    .pylon-label { position:absolute; top:-18px; left:50%; transform:translateX(-50%); font-size:11px; font-weight:800; white-space:nowrap; }
+
     .enemy-bullet {
       position: absolute;
       width: 14px;
@@ -521,7 +535,8 @@
       { id: "fangs", name: "Steel Fangs", cost: 56, max: 12, desc: "+2 attack", apply: s => s.damage += 2 },
       { id: "shell", name: "Titan Shell", cost: 62, max: 15, desc: "+2 defense", apply: s => s.defense += 2 },
       { id: "vital", name: "Giga Vitamins", cost: 60, max: 12, desc: "+18 max HP", apply: s => { s.maxHp += 18; s.hp = Math.min(s.maxHp, s.hp + 12); } },
-      { id: "helper", name: "Rat Whistle", cost: 95, max: 5, desc: "Roll helper rat (max 5)", apply: s => addHelperFromRoll() }
+      { id: "helper", name: "Rat Whistle", cost: 95, max: 5, desc: "Roll helper rat (max 5)", apply: s => addHelperFromRoll() },
+      { id: "defpierce", name: "Defense Piercer", cost: 300, max: 10, desc: "+50 defense pierce", apply: s => s.playerDefensePierce += 50 }
     ];
 
     const helperRarityTable = [
@@ -609,6 +624,11 @@
       regenBlockedUntil: 0,
       slowedUntil: 0,
       vulnUntil: 0,
+      playerDefensePierce: 0,
+      bossMilestoneSpawned: {},
+      lunaticSpawned: false,
+      pylons: [],
+      pylonLastSpawn: 0,
       touch: { up: false, down: false, left: false, right: false },
       playerId: localStorage.getItem("fatRatPlayerId") || crypto.randomUUID(),
       remoteBoard: [],
@@ -739,8 +759,7 @@
 
 
     function getBoostMax(item) {
-      if (["speed", "coin", "mult"].includes(item.id)) return item.max;
-      return item.max + Math.floor(state.wave / 3);
+      return item.max + Math.floor(state.wave / 10) * 25;
     }
 
     function renderShop() {
@@ -1129,16 +1148,42 @@
       plague: { name: "Plague Rat", hp: 3200, speed: 2.1, damage: 38, defense: 90, range: 300, fireRate: 620, defensePierce: 26, debuff: "noregen", badge: "☣️", primary: "#86efac", secondary: "#166534" },
       railgun: { name: "Railgun Rat", hp: 4600, speed: 1.5, damage: 44, defense: 110, range: 360, fireRate: 780, defensePierce: 45, debuff: "vuln", badge: "🚄", primary: "#bfdbfe", secondary: "#1d4ed8" },
       fishron: { name: "DUKE RATRON 🦈", hp: 98000, speed: 2.2, damage: 95, defense: 420, boss: true, range: 420, fireRate: 340, defensePierce: 220, debuff: "slow", ultraRate: 5200, badge: "🦈", primary: "#67e8f9", secondary: "#0e7490" },
-      empress: { name: "EMPRESS OF LIGHT RAT ✨", hp: 145000, speed: 2.5, damage: 120, defense: 520, boss: true, range: 460, fireRate: 300, defensePierce: 280, debuff: "vuln", ultraRate: 4600, badge: "✨", primary: "#fbcfe8", secondary: "#a21caf" }
+      empress: { name: "EMPRESS OF LIGHT RAT ✨", hp: 145000, speed: 2.5, damage: 120, defense: 520, boss: true, range: 460, fireRate: 300, defensePierce: 280, debuff: "vuln", ultraRate: 4600, badge: "✨", primary: "#fbcfe8", secondary: "#a21caf" },
+      stormlord: { name: "Stormlord Rat ⚡", hp: 170000, speed: 2.3, damage: 130, defense: 560, boss: true, range: 470, fireRate: 290, defensePierce: 300, debuff: "slow", ultraRate: 4300, badge: "⚡", primary: "#bfdbfe", secondary: "#1d4ed8" },
+      abyss: { name: "Abyss Rat 🌊", hp: 200000, speed: 2.1, damage: 140, defense: 600, boss: true, range: 490, fireRate: 280, defensePierce: 320, debuff: "noregen", ultraRate: 4200, badge: "🌊", primary: "#7dd3fc", secondary: "#155e75" },
+      nebula: { name: "Nebula Rat 🌌", hp: 240000, speed: 2.4, damage: 150, defense: 650, boss: true, range: 510, fireRate: 270, defensePierce: 340, debuff: "vuln", ultraRate: 4100, badge: "🌌", primary: "#c4b5fd", secondary: "#5b21b6" },
+      inferno: { name: "Inferno Rat 🔥", hp: 280000, speed: 2.2, damage: 165, defense: 700, boss: true, range: 520, fireRate: 260, defensePierce: 360, debuff: "noregen", ultraRate: 4000, badge: "🔥", primary: "#fdba74", secondary: "#9a3412" },
+      chrono: { name: "Chrono Rat ⏳", hp: 320000, speed: 2.5, damage: 180, defense: 760, boss: true, range: 530, fireRate: 250, defensePierce: 390, debuff: "slow", ultraRate: 3900, badge: "⏳", primary: "#fde68a", secondary: "#a16207" },
+      voidemperor: { name: "Void Emperor Rat 👁️", hp: 370000, speed: 2.4, damage: 190, defense: 820, boss: true, range: 550, fireRate: 240, defensePierce: 420, debuff: "vuln", ultraRate: 3800, badge: "👁️", primary: "#a5b4fc", secondary: "#312e81" },
+      dread: { name: "Dread Rat ☠️", hp: 430000, speed: 2.6, damage: 205, defense: 900, boss: true, range: 560, fireRate: 235, defensePierce: 450, debuff: "noregen", ultraRate: 3700, badge: "☠️", primary: "#fecaca", secondary: "#7f1d1d" },
+      omen: { name: "Omen Rat 🔮", hp: 470000, speed: 2.7, damage: 220, defense: 980, boss: true, range: 580, fireRate: 230, defensePierce: 480, debuff: "slow", ultraRate: 3600, badge: "🔮", primary: "#f0abfc", secondary: "#86198f" },
+      lunatic: { name: "LUNATIC RAT 🌀", hp: 500000, speed: 2.9, damage: 260, defense: 500, boss: true, range: 620, fireRate: 220, defensePierce: 500, debuff: "vuln", ultraRate: 3400, badge: "🌀", primary: "#e2e8f0", secondary: "#334155" },
+      lunatic_clone: { name: "Lunatic Clone", hp: 18000, speed: 3.1, damage: 120, defense: 45, range: 420, fireRate: 380, defensePierce: 120, debuff: "vuln", badge: "🌀", primary: "#cbd5e1", secondary: "#475569" },
+      windling: { name: "Windling Rat", hp: 2200, speed: 3.8, damage: 90, defense: 120, range: 300, fireRate: 540, defensePierce: 180, debuff: "slow", badge: "🌪️", primary: "#bae6fd", secondary: "#0c4a6e" },
+      waterling: { name: "Waterling Rat", hp: 2400, speed: 3.2, damage: 95, defense: 140, range: 310, fireRate: 520, defensePierce: 190, debuff: "noregen", badge: "💧", primary: "#99f6e4", secondary: "#115e59" }
     };
 
+
+    function milestoneBossForWave(wave) {
+      const table = {
+        10: "king", 20: "apex", 30: "fishron", 40: "empress", 50: "stormlord", 60: "abyss",
+        70: "nebula", 80: "inferno", 90: "chrono", 100: "voidemperor", 110: "dread", 120: "omen", 130: "lunatic"
+      };
+      return table[wave] || null;
+    }
+
     function pickEnemyType() {
-      if (state.wave >= 40 && !state.wave40BossSpawned) return "empress";
-      if (state.wave >= 30 && !state.wave30BossSpawned) return "fishron";
-      if (state.wave >= 20 && !state.wave20BossSpawned) return "apex";
+      const milestoneBoss = milestoneBossForWave(state.wave);
+      if (milestoneBoss && !state.bossMilestoneSpawned[state.wave]) return milestoneBoss;
       if (state.modeEnemyMultiplier > 1.45 && Math.random() < 0.18) return "king";
-      if (state.wave % 10 === 0 && !state.bossEnemyId && state.wave < 20) return "king";
       const roll = Math.random();
+      if (state.wave >= 130) {
+        if (roll < 0.3) return "lunatic_clone";
+        if (roll < 0.52) return "omen";
+        if (roll < 0.72) return "dread";
+        if (roll < 0.86) return "voidemperor";
+        return "chrono";
+      }
       if (state.wave >= 40) {
         if (roll < 0.2) return "empress";
         if (roll < 0.36) return "fishron";
@@ -1198,7 +1243,8 @@
     }
 
     function damageEnemy(enemy, amount) {
-      const real = Math.max(1, amount - (enemy.defense || 0) * 0.5);
+      const effectiveEnemyDefense = Math.max(0, (enemy.defense || 0) - state.playerDefensePierce);
+      const real = Math.max(1, amount - effectiveEnemyDefense * 0.5);
       enemy.hp -= real;
       enemy.wasDamaged = true;
       const hpFill = document.querySelector(`#${enemy.id} .enemy-hp-fill`);
@@ -1210,14 +1256,15 @@
       }
     }
 
-    function spawnEnemy() {
-      const typeId = pickEnemyType();
+
+    function spawnEnemyFromType(typeId, x, y, extra = {}) {
       const type = enemyTypes[typeId];
+      if (!type) return;
       const enemy = {
         id: `enemy-${Math.random().toString(36).slice(2)}`,
         type: typeId,
-        x: Math.random() * Math.max(20, gameArea.clientWidth - 46),
-        y: Math.random() * Math.max(20, gameArea.clientHeight - 46),
+        x: x ?? Math.random() * Math.max(20, gameArea.clientWidth - 46),
+        y: y ?? Math.random() * Math.max(20, gameArea.clientHeight - 46),
         speed: type.speed * state.modeEnemyMultiplier,
         hp: type.hp,
         maxHp: type.hp,
@@ -1235,12 +1282,15 @@
         name: type.name,
         badge: type.badge || "",
         primary: type.primary || "#d8b4fe",
-        secondary: type.secondary || "#7c3aed"
+        secondary: type.secondary || "#7c3aed",
+        pylonZone: extra.pylonZone || null
       };
       if (enemy.boss) state.bossEnemyId = enemy.id;
+      if (enemy.boss) state.bossMilestoneSpawned[state.wave] = true;
       if (enemy.type === "apex") state.wave20BossSpawned = true;
       if (enemy.type === "fishron") state.wave30BossSpawned = true;
       if (enemy.type === "empress") state.wave40BossSpawned = true;
+      if (enemy.type === "lunatic") state.lunaticSpawned = true;
       state.enemies.push(enemy);
       const el = document.createElement("div");
       el.id = enemy.id;
@@ -1253,6 +1303,97 @@
       el.innerHTML = `<div class="enemy-hp"><div class="enemy-hp-fill"></div></div><span class="enemy-tail"></span><span class="enemy-eye"></span><span class="enemy-nose"></span><span class="enemy-badge">${enemy.badge || ""}</span>`;
       gameArea.appendChild(el);
       updateBossHud();
+    }
+
+    function spawnPylonsAfterLunatic() {
+      if (state.pylons.length) return;
+      const defs = [
+        { type: "wind", label: "Wind Pylon", a: "#bae6fd", b: "#0c4a6e", enemy: "windling" },
+        { type: "water", label: "Water Pylon", a: "#99f6e4", b: "#115e59", enemy: "waterling" }
+      ];
+      defs.forEach((def, i) => {
+        const p = {
+          id: `pylon-${def.type}`,
+          type: def.type,
+          label: def.label,
+          enemyType: def.enemy,
+          x: Math.random() * Math.max(80, gameArea.clientWidth - 120),
+          y: Math.random() * Math.max(80, gameArea.clientHeight - 140),
+          hp: 2400,
+          defense: 999999,
+          kills: 0,
+          requiredKills: 100,
+          a: def.a,
+          b: def.b
+        };
+        state.pylons.push(p);
+        const el = document.createElement("div");
+        el.id = p.id;
+        el.className = "pylon";
+        el.style.left = `${p.x}px`;
+        el.style.top = `${p.y}px`;
+        el.style.setProperty("--pylon-a", p.a);
+        el.style.setProperty("--pylon-b", p.b);
+        el.innerHTML = `<div class="pylon-label">${p.label} (0/100)</div>`;
+        gameArea.appendChild(el);
+      });
+      showWavePopup("🌪️💧 Two pylons appeared! Defeat 100 zone enemies each.");
+      setStatus("Pylons are protected at 999k DEF until 100 zone kills.", "#93c5fd");
+    }
+
+    function registerPylonEnemyKill(zoneType) {
+      const p = state.pylons.find(x => x.type === zoneType);
+      if (!p) return;
+      p.kills += 1;
+      if (p.kills >= p.requiredKills && p.defense > 10) {
+        p.defense = 10;
+        setStatus(`${p.label} shield collapsed!`, "#86efac");
+      }
+    }
+
+    function updatePylons(ts) {
+      if (!state.pylons.length) return;
+      state.pylons.forEach(p => {
+        const el = document.getElementById(p.id);
+        if (el) {
+          const lbl = el.querySelector('.pylon-label');
+          if (lbl) lbl.textContent = `${p.label} (${Math.min(p.kills,p.requiredKills)}/${p.requiredKills}) DEF:${p.defense > 1000 ? '999k+' : p.defense}`;
+        }
+      });
+
+      if (ts - state.pylonLastSpawn > 1800) {
+        state.pylonLastSpawn = ts;
+        state.pylons.forEach(p => {
+          if (state.enemies.length < 40) {
+            spawnEnemyFromType(p.enemyType, p.x + Math.random()*90 - 30, p.y + Math.random()*90 - 30, { pylonZone: p.type });
+            spawnEnemyFromType(p.enemyType, p.x + Math.random()*90 - 30, p.y + Math.random()*90 - 30, { pylonZone: p.type });
+          }
+        });
+      }
+
+      const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
+      state.pylons = state.pylons.filter(p => {
+        const pBox = { x: p.x, y: p.y, w: 56, h: 76 };
+        if (intersects(ratBox, pBox)) {
+          if (p.defense <= 10) {
+            p.hp -= Math.max(2, getPlayerAttack() * 0.85 - p.defense * 0.5);
+          }
+        }
+        if (p.hp <= 0) {
+          document.getElementById(p.id)?.remove();
+          setStatus(`${p.label} destroyed!`, "#fde68a");
+          return false;
+        }
+        return true;
+      });
+      if (!state.pylons.length && state.lunaticSpawned) {
+        showWavePopup("⚡ Pylon event cleared!");
+      }
+    }
+
+    function spawnEnemy() {
+      const typeId = pickEnemyType();
+      spawnEnemyFromType(typeId);
     }
 
     function spawnPcPickup() {
@@ -1435,7 +1576,14 @@
             enemy.lastShot = ts;
           }
           if (enemy.ultraRate && ts - enemy.lastUltra > enemy.ultraRate) {
-            if (enemy.type === "fishron") {
+            if (enemy.type === "lunatic") {
+              for (let i = 0; i < 4; i++) spawnEnemyFromType("lunatic_clone", enemy.x + (Math.random()*160-80), enemy.y + (Math.random()*120-60), { pylonZone: "none" });
+              for (let i = 0; i < 20; i++) {
+                const angle = (Math.PI * 2 * i) / 20 + (ts / 500);
+                spawnEnemyBullet(enemy, enemy.x + Math.cos(angle) * 260, enemy.y + Math.sin(angle) * 260, { speed: 6.8, damage: enemy.damage * 1.25, size: 20, life: 2800, debuff: "vuln" });
+              }
+              showWavePopup("🌀 LUNATIC RAT ritual clones unleashed!");
+            } else if (enemy.type === "fishron") {
               for (let i = 0; i < 3; i++) {
                 spawnEnemyBullet(enemy, ratCenterX + (i - 1) * 80, ratCenterY, { speed: 8.2, damage: enemy.damage * 1.2, size: 18, life: 1500, debuff: "slow" });
               }
@@ -1487,7 +1635,9 @@
           document.getElementById(enemy.id)?.remove();
           if (enemy.boss) {
             setStatus(`${enemy.name} defeated!`, "#fde68a");
+            if (enemy.type === "lunatic") spawnPylonsAfterLunatic();
           }
+          if (enemy.pylonZone) registerPylonEnemyKill(enemy.pylonZone);
           state.uiDirty = true;
           return false;
         }
@@ -1593,7 +1743,16 @@
       const baseCount = 4 + wave * 2;
       state.waveSpawnLeft = wave >= 20 ? baseCount + 10 : wave >= 15 ? baseCount + 6 : wave >= 10 ? baseCount + 3 : baseCount;
       state.waveSpawnTick = 0;
-      if (wave === 40) {
+      if (wave === 130) {
+        showWavePopup("LUNATIC RAT HAS SPAWNED ! 500k hp ");
+        setStatus("LUNATIC RAT HAS SPAWNED ! 500k hp ", "#fde68a");
+      } else if (wave === 120) {
+        showWavePopup("u dont listen to me?");
+        setStatus("u dont listen to me?", "#fda4af");
+      } else if (wave === 110) {
+        showWavePopup("know your place...");
+        setStatus("know your place...", "#fda4af");
+      } else if (wave === 40) {
         showWavePopup("WAVE 40 started... EMPRESS OF LIGHT RAT descended!");
         setStatus("Final nightmare: huge but dodgeable light attacks!", "#f9a8d4");
       } else if (wave === 30) {
@@ -1650,6 +1809,7 @@
       updateHelperRats(ts);
       updateEnemies(ts);
       updateEnemyBullets(dt);
+      updatePylons(ts);
       maybeAutoUnlockAndTravel();
 
       if (state.uiDirty) renderAll();
