@@ -47,7 +47,7 @@
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(6, minmax(90px, 1fr));
+      grid-template-columns: repeat(8, minmax(90px, 1fr));
       gap: 8px;
     }
 
@@ -138,6 +138,28 @@
       pointer-events: none;
     }
 
+
+    .enemy {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      font-size: 28px;
+      display: grid;
+      place-items: center;
+      filter: drop-shadow(0 6px 6px rgba(0,0,0,.35));
+      pointer-events: none;
+    }
+
+    .pickup {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      font-size: 24px;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
     .modal {
       position: fixed;
       inset: 0;
@@ -216,6 +238,11 @@
       margin-top: 4px;
     }
 
+    .small-input {
+      width: 90px;
+      text-align: center;
+    }
+
     @media (max-width: 760px) {
       .stats { grid-template-columns: repeat(3, 1fr); }
       #gameArea { min-height: 58vh; margin-bottom: 130px; }
@@ -232,15 +259,18 @@
       <div class="pill">🌍 <span id="zoneStat">Alley</span></div>
       <div class="pill">⚡ <span id="modeStat">Classic</span></div>
       <div class="pill">🔥 Combo <span id="comboStat">x1</span></div>
+      <div class="pill">❤️ HP <span id="hpStat">100</span></div>
+      <div class="pill">🌊 Wave <span id="waveStat">1</span></div>
     </div>
     <div class="button-row">
       <button class="ios-btn" id="openShopBtn">Boosts</button>
       <button class="ios-btn secondary" id="openZonesBtn">Zones</button>
       <button class="ios-btn" id="openRatBtn">Customize Rat</button>
+      <button class="ios-btn secondary" id="openPcBtn">PC Accessories</button>
       <button class="ios-btn secondary" id="openLeaderboardBtn">World Leaderboard</button>
       <button class="ios-btn" id="openModesBtn">Game Modes</button>
     </div>
-    <div class="pill">Move with WASD / Arrow Keys</div>
+    <div class="pill">Move with WASD / Arrow Keys • Survive waves</div>
     <div class="status" id="statusMsg"></div>
   </header>
 
@@ -287,6 +317,14 @@
   </div>
 
 
+  <div class="modal" id="pcModal">
+    <div class="sheet">
+      <div class="row"><h2>💻 PC Accessories</h2><button class="ios-btn secondary" data-close="#pcModal">Close</button></div>
+      <div class="card" style="margin-bottom:10px">Equipped accessories spawn in the arena as pickups for bonus coins/fat.</div>
+      <div id="pcList"></div>
+    </div>
+  </div>
+
   <div class="modal" id="modesModal">
     <div class="sheet">
       <div class="row"><h2>🎮 Game Modes</h2><button class="ios-btn secondary" data-close="#modesModal">Close</button></div>
@@ -319,24 +357,47 @@
 
   <script>
     const zones = [
-      { name: "Alley", unlockAt: 0, foodRate: 1100, foodFat: 1, bg: "linear-gradient(160deg,#334155,#1e293b)" },
-      { name: "Food Court", unlockAt: 35, foodRate: 840, foodFat: 2, bg: "linear-gradient(160deg,#065f46,#022c22)" },
-      { name: "Mega Buffet", unlockAt: 90, foodRate: 620, foodFat: 3, bg: "linear-gradient(160deg,#7f1d1d,#450a0a)" },
-      { name: "Cosmic Kitchen", unlockAt: 180, foodRate: 500, foodFat: 4, bg: "linear-gradient(160deg,#312e81,#1e1b4b)" }
+      { name: "Alley", unlockAt: 0, foodRate: 1120, foodFat: 1, bg: "linear-gradient(160deg,#334155,#1e293b)" },
+      { name: "Food Court", unlockAt: 35, foodRate: 920, foodFat: 2, bg: "linear-gradient(160deg,#065f46,#022c22)" },
+      { name: "Mega Buffet", unlockAt: 90, foodRate: 780, foodFat: 3, bg: "linear-gradient(160deg,#7f1d1d,#450a0a)" },
+      { name: "Cosmic Kitchen", unlockAt: 180, foodRate: 660, foodFat: 4, bg: "linear-gradient(160deg,#312e81,#1e1b4b)" },
+      { name: "Sewer Speedway", unlockAt: 280, foodRate: 620, foodFat: 5, bg: "linear-gradient(160deg,#0f766e,#134e4a)" },
+      { name: "Neon Diner", unlockAt: 420, foodRate: 560, foodFat: 6, bg: "linear-gradient(160deg,#7e22ce,#4c1d95)" },
+      { name: "Sky Snack Deck", unlockAt: 600, foodRate: 520, foodFat: 7, bg: "linear-gradient(160deg,#1d4ed8,#1e3a8a)" },
+      { name: "Volcano Grill", unlockAt: 820, foodRate: 480, foodFat: 8, bg: "linear-gradient(160deg,#b91c1c,#7f1d1d)" },
+      { name: "Candy Crater", unlockAt: 1080, foodRate: 450, foodFat: 9, bg: "linear-gradient(160deg,#be185d,#831843)" },
+      { name: "Royal Fridge", unlockAt: 1400, foodRate: 420, foodFat: 10, bg: "linear-gradient(160deg,#4338ca,#1e1b4b)" },
+      { name: "Burger Galaxy", unlockAt: 1800, foodRate: 390, foodFat: 12, bg: "linear-gradient(160deg,#0f172a,#020617)" },
+      { name: "Infinity Pantry", unlockAt: 2300, foodRate: 350, foodFat: 14, bg: "linear-gradient(160deg,#14532d,#052e16)" },
+      { name: "God Rat Realm", unlockAt: 3000, foodRate: 300, foodFat: 18, bg: "linear-gradient(160deg,#4c0519,#111827)" },
+      { name: "Cheese Singularity", unlockAt: 4000, foodRate: 260, foodFat: 25, bg: "linear-gradient(160deg,#713f12,#292524)" }
     ];
 
     const shopItems = [
       { id: "speed", name: "Rocket Sneakers", cost: 12, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
       { id: "mult", name: "Grease Booster", cost: 20, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
       { id: "spawn", name: "Snack Magnet", cost: 28, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
-      { id: "coin", name: "Golden Whiskers", cost: 25, desc: "+1 coin per food", apply: s => s.coinBoost += 1 }
+      { id: "coin", name: "Golden Whiskers", cost: 25, desc: "+1 coin per food", apply: s => s.coinBoost += 1 },
+      { id: "armor", name: "Cheese Armor", cost: 34, desc: "+10 max HP", apply: s => { s.maxHp += 10; s.hp = Math.min(s.maxHp, s.hp + 8); } },
+      { id: "regen", name: "Regeneration Soda", cost: 45, desc: "+0.12 HP regen", apply: s => s.hpRegen += 0.12 },
+      { id: "damage", name: "Spicy Bite", cost: 38, desc: "+1 rat damage", apply: s => s.damage += 1 },
+      { id: "vacuum", name: "Vacuum Belly", cost: 50, desc: "+4 pickup hitbox", apply: s => s.hitboxBonus += 4 }
     ];
 
     const gameModes = [
-      { id: "classic", name: "Classic", desc: "Balanced gameplay.", fatMul: 1, spawnMul: 1, coinBonus: 0 },
-      { id: "feast", name: "Feast Frenzy", desc: "Way more food and fat gain.", fatMul: 1.35, spawnMul: 0.75, coinBonus: 1 },
-      { id: "rush", name: "Turbo Rush", desc: "Fast rat, faster zone progression.", fatMul: 1.15, spawnMul: 0.85, coinBonus: 0 },
-      { id: "challenge", name: "Grease Challenge", desc: "Hard mode, but juicy rewards.", fatMul: 1.6, spawnMul: 1.25, coinBonus: 2 }
+      { id: "classic", name: "Classic", desc: "Balanced gameplay.", fatMul: 1, spawnMul: 1, coinBonus: 0, enemyMul: 1 },
+      { id: "feast", name: "Feast Frenzy", desc: "Way more food and fat gain.", fatMul: 1.35, spawnMul: 0.75, coinBonus: 1, enemyMul: 0.95 },
+      { id: "rush", name: "Turbo Rush", desc: "Fast rat, faster zone progression.", fatMul: 1.15, spawnMul: 0.85, coinBonus: 0, enemyMul: 1.05 },
+      { id: "challenge", name: "Grease Challenge", desc: "Hard mode, but juicy rewards.", fatMul: 1.6, spawnMul: 1.25, coinBonus: 2, enemyMul: 1.2 },
+      { id: "survival", name: "Rat Survival", desc: "Enemies hit harder, rewards scale.", fatMul: 1.5, spawnMul: 1.15, coinBonus: 2, enemyMul: 1.35 },
+      { id: "bossrush", name: "Boss Rush", desc: "Bosses spawn faster.", fatMul: 1.35, spawnMul: 1.05, coinBonus: 2, enemyMul: 1.55 }
+    ];
+
+    const accessoryShopItems = [
+      { id: "keyboard", name: "RGB Keyboard", cost: 70, bonus: "+0.5 speed", spawn: "⌨️", effect: s => s.speed += 0.5 },
+      { id: "mouse", name: "Pro Mouse", cost: 80, bonus: "+1 damage", spawn: "🖱️", effect: s => s.damage += 1 },
+      { id: "gpu", name: "Rat RTX", cost: 120, bonus: "+10% fat gain", spawn: "🧩", effect: s => s.pcFatBonus += 0.1 },
+      { id: "headset", name: "Gamer Headset", cost: 90, bonus: "+0.15 HP regen", spawn: "🎧", effect: s => s.hpRegen += 0.15 }
     ];
 
     const state = {
@@ -365,7 +426,21 @@
       modeFatMultiplier: 1,
       modeSpawnMultiplier: 1,
       modeCoinBonus: 0,
+      modeEnemyMultiplier: 1,
       combo: 1,
+      hp: 100,
+      maxHp: 100,
+      hpRegen: 0.08,
+      damage: 2,
+      hitboxBonus: 0,
+      wave: 1,
+      enemies: [],
+      pickups: [],
+      lastEnemySpawn: 0,
+      lastPickupSpawn: 0,
+      pcOwned: {},
+      pcEquipped: {},
+      pcFatBonus: 0,
       touch: { up: false, down: false, left: false, right: false },
       playerId: localStorage.getItem("fatRatPlayerId") || crypto.randomUUID(),
       remoteBoard: [],
@@ -383,9 +458,12 @@
     const zoneStat = document.getElementById("zoneStat");
     const modeStat = document.getElementById("modeStat");
     const comboStat = document.getElementById("comboStat");
+    const hpStat = document.getElementById("hpStat");
+    const waveStat = document.getElementById("waveStat");
     const statusMsg = document.getElementById("statusMsg");
     const shopList = document.getElementById("shopList");
     const zonesList = document.getElementById("zonesList");
+    const pcList = document.getElementById("pcList");
     const modesList = document.getElementById("modesList");
     const leaderboardList = document.getElementById("leaderboardList");
     const myRankText = document.getElementById("myRankText");
@@ -410,14 +488,18 @@
       zoneStat.textContent = currentZone().name;
       modeStat.textContent = gameModes.find(m => m.id === state.currentMode)?.name || "Classic";
       comboStat.textContent = `x${state.combo.toFixed(1)}`;
+      hpStat.textContent = Math.round(state.hp);
+      waveStat.textContent = state.wave;
       gameArea.style.background = currentZone().bg;
 
       const visualScale = Math.min(1 + state.fat * 0.016, 3.4);
       ratEl.style.transform = `scale(${visualScale})`;
 
       // Bigger fat = bigger collection hitbox
-      state.rat.w = 64 * Math.min(1 + state.fat * 0.01, 2.8);
-      state.rat.h = 48 * Math.min(1 + state.fat * 0.01, 2.8);
+      const hitboxScale = Math.min(1 + state.fat * 0.01, 3.2);
+      const pcHitboxBonus = state.pcEquipped.keyboard ? 8 : 0;
+      state.rat.w = 64 * hitboxScale + state.hitboxBonus + pcHitboxBonus;
+      state.rat.h = 48 * hitboxScale + state.hitboxBonus + pcHitboxBonus;
 
       ratEl.style.setProperty("--rat-primary", state.ratPrimary);
       ratEl.style.setProperty("--rat-secondary", state.ratSecondary);
@@ -441,11 +523,22 @@
     function renderShop() {
       shopList.innerHTML = "";
       shopItems.forEach(item => {
-        const canBuy = state.coins >= item.cost;
         const card = document.createElement("div");
         card.className = "card";
-        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins</div></div><button class="ios-btn" data-buy="${item.id}" ${canBuy ? "" : "disabled"}>${canBuy ? "Buy" : "Need Coins"}</button></div>`;
+        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins each</div></div><div><input class="small-input" type="number" min="1" value="1" data-qty="${item.id}" /><button class="ios-btn" data-buy="${item.id}" data-amount="1" ${state.coins >= item.cost ? "" : "disabled"}>Buy 1</button><button class="ios-btn secondary" data-buy="${item.id}" data-amount="custom">Buy x</button></div></div>`;
         shopList.appendChild(card);
+      });
+    }
+
+    function renderPcShop() {
+      pcList.innerHTML = "";
+      accessoryShopItems.forEach(item => {
+        const owned = state.pcOwned[item.id] || 0;
+        const equipped = !!state.pcEquipped[item.id];
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.bonus}</div><div>Cost: ${item.cost} coins • Owned: ${owned}</div><div>Spawn pickup: ${item.spawn}</div></div><div><button class="ios-btn" data-pc-buy="${item.id}" ${state.coins >= item.cost ? "" : "disabled"}>Buy</button><button class="ios-btn secondary" data-pc-equip="${item.id}" ${owned < 1 ? "disabled" : ""}>${equipped ? "Unequip" : "Equip"}</button></div></div>`;
+        pcList.appendChild(card);
       });
     }
 
@@ -479,6 +572,7 @@
       state.modeFatMultiplier = mode.fatMul;
       state.modeSpawnMultiplier = mode.spawnMul;
       state.modeCoinBonus = mode.coinBonus;
+      state.modeEnemyMultiplier = mode.enemyMul || 1;
       state.uiDirty = true;
       setStatus(`Mode switched: ${mode.name}`, "#93c5fd");
     }
@@ -700,14 +794,36 @@
       myRankText.textContent = myRank ? `Your place: #${myRank} with ${state.totalFatEarned} fat${errorText}` : `Play to get ranked.${errorText}`;
     }
 
-    function buyItem(id) {
+    function buyItem(id, amount = 1) {
       const item = shopItems.find(i => i.id === id);
+      if (!item) return;
+      const count = Math.max(1, Math.min(100, Number(amount) || 1));
+      const total = item.cost * count;
+      if (state.coins < total) {
+        setStatus(`Need ${total} coins for ${count}x ${item.name}`, "#fca5a5");
+        return;
+      }
+      state.coins -= total;
+      for (let i = 0; i < count; i++) item.apply(state);
+      state.uiDirty = true;
+      setStatus(`Bought ${count}x ${item.name}!`, "#86efac");
+    }
+
+    function buyPcAccessory(id) {
+      const item = accessoryShopItems.find(i => i.id === id);
       if (!item) return;
       if (state.coins < item.cost) return;
       state.coins -= item.cost;
-      item.apply(state);
+      state.pcOwned[id] = (state.pcOwned[id] || 0) + 1;
       state.uiDirty = true;
-      setStatus(`Bought ${item.name}!`, "#86efac");
+      setStatus(`Bought ${item.name}`, "#86efac");
+    }
+
+    function togglePcEquip(id) {
+      if (!(state.pcOwned[id] > 0)) return;
+      state.pcEquipped[id] = !state.pcEquipped[id];
+      state.uiDirty = true;
+      setStatus(state.pcEquipped[id] ? `Equipped ${id}` : `Unequipped ${id}`, "#93c5fd");
     }
 
     function travelToZone(idx) {
@@ -730,6 +846,50 @@
         state.uiDirty = true;
         setStatus(`${zones[newest].name} unlocked! Auto-traveled 🚀`, "#86efac");
       }
+    }
+
+    function spawnEnemy() {
+      const bossWave = state.wave % 5 === 0;
+      const enemy = {
+        id: `enemy-${Math.random().toString(36).slice(2)}`,
+        x: Math.random() * Math.max(20, gameArea.clientWidth - 36),
+        y: Math.random() * Math.max(20, gameArea.clientHeight - 36),
+        speed: (bossWave ? 1.2 : 1.7) * state.modeEnemyMultiplier,
+        hp: bossWave ? 16 + state.wave * 2 : 5 + state.wave,
+        damage: bossWave ? 8 + Math.floor(state.wave / 2) : 3 + Math.floor(state.wave / 4),
+        boss: bossWave,
+        emoji: bossWave ? "👹" : "🪳"
+      };
+      state.enemies.push(enemy);
+      const el = document.createElement("div");
+      el.id = enemy.id;
+      el.className = "enemy";
+      el.style.left = `${enemy.x}px`;
+      el.style.top = `${enemy.y}px`;
+      el.textContent = enemy.emoji;
+      gameArea.appendChild(el);
+    }
+
+    function spawnPcPickup() {
+      const equipped = accessoryShopItems.filter(item => state.pcEquipped[item.id]);
+      if (!equipped.length) return;
+      const picked = equipped[Math.floor(Math.random() * equipped.length)];
+      const pickup = {
+        id: `pickup-${Math.random().toString(36).slice(2)}`,
+        x: Math.random() * Math.max(30, gameArea.clientWidth - 34),
+        y: Math.random() * Math.max(30, gameArea.clientHeight - 34),
+        bonusFat: 3 + state.wave,
+        bonusCoins: 5,
+        emoji: picked.spawn
+      };
+      state.pickups.push(pickup);
+      const el = document.createElement("div");
+      el.id = pickup.id;
+      el.className = "pickup";
+      el.style.left = `${pickup.x}px`;
+      el.style.top = `${pickup.y}px`;
+      el.textContent = pickup.emoji;
+      gameArea.appendChild(el);
     }
 
     function spawnFood() {
@@ -763,7 +923,7 @@
     }
 
     function updateRat() {
-      const moveSpeed = state.speed + (state.currentMode === "rush" ? 0.9 : 0);
+      const moveSpeed = state.speed + (state.currentMode === "rush" ? 0.9 : 0) + (state.pcEquipped.keyboard ? 0.5 : 0);
       if (state.keys.ArrowUp || state.keys.w || state.touch.up) state.rat.y -= moveSpeed;
       if (state.keys.ArrowDown || state.keys.s || state.touch.down) state.rat.y += moveSpeed;
       if (state.keys.ArrowLeft || state.keys.a || state.touch.left) state.rat.x -= moveSpeed;
@@ -780,7 +940,7 @@
         const hit = intersects(ratBox, { x: food.x, y: food.y, w: 24, h: 24 });
         if (!hit) return true;
         const comboBoost = Math.min(1 + (state.combo - 1) * 0.08, 2.2);
-        const fatGain = Math.max(1, Math.round(food.fatValue * state.modeFatMultiplier * comboBoost));
+        const fatGain = Math.max(1, Math.round(food.fatValue * state.modeFatMultiplier * (1 + state.pcFatBonus) * comboBoost));
         state.fat += fatGain;
         state.totalFatEarned += fatGain;
         state.coins += food.coinValue + state.modeCoinBonus;
@@ -797,24 +957,101 @@
       }
     }
 
+    function updateEnemies() {
+      const ratCenterX = state.rat.x + state.rat.w / 2;
+      const ratCenterY = state.rat.y + state.rat.h / 2;
+      state.enemies.forEach(enemy => {
+        const dx = ratCenterX - enemy.x;
+        const dy = ratCenterY - enemy.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        enemy.x += (dx / dist) * enemy.speed;
+        enemy.y += (dy / dist) * enemy.speed;
+        const enemyEl = document.getElementById(enemy.id);
+        if (enemyEl) {
+          enemyEl.style.left = `${enemy.x}px`;
+          enemyEl.style.top = `${enemy.y}px`;
+        }
+      });
+
+      const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
+      state.enemies = state.enemies.filter(enemy => {
+        const enemyBox = { x: enemy.x, y: enemy.y, w: enemy.boss ? 40 : 30, h: enemy.boss ? 40 : 30 };
+        if (intersects(ratBox, enemyBox)) {
+          state.hp -= enemy.damage * 0.03;
+          enemy.hp -= state.damage * 0.08;
+        }
+        if (enemy.hp <= 0) {
+          state.coins += enemy.boss ? 30 : 8;
+          state.totalFatEarned += enemy.boss ? 12 : 4;
+          document.getElementById(enemy.id)?.remove();
+          state.uiDirty = true;
+          return false;
+        }
+        return true;
+      });
+
+      if (state.hp <= 0) {
+        state.hp = state.maxHp;
+        state.wave = Math.max(1, state.wave - 1);
+        state.fat = Math.max(0, state.fat - 30);
+        state.combo = 1;
+        setStatus("You got bonked! Respawned with HP reset.", "#fca5a5");
+      }
+    }
+
+    function collectPickups() {
+      const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
+      state.pickups = state.pickups.filter(p => {
+        if (!intersects(ratBox, { x: p.x, y: p.y, w: 28, h: 28 })) return true;
+        state.totalFatEarned += p.bonusFat;
+        state.coins += p.bonusCoins;
+        state.fat += p.bonusFat;
+        document.getElementById(p.id)?.remove();
+        state.uiDirty = true;
+        return false;
+      });
+    }
+
     function renderAll() {
       renderHUD();
       renderShop();
       renderZones();
+      renderPcShop();
       renderModes();
       renderLeaderboard();
       state.uiDirty = false;
     }
 
     function gameLoop(ts) {
-      const spawnEvery = Math.max(180, (currentZone().foodRate - state.spawnBoost) * state.modeSpawnMultiplier);
-      if (ts - state.lastSpawn > spawnEvery && state.foods.length < 20) {
+      const spawnEvery = Math.max(170, (currentZone().foodRate - state.spawnBoost) * state.modeSpawnMultiplier);
+      if (ts - state.lastSpawn > spawnEvery && state.foods.length < 26) {
         spawnFood();
         state.lastSpawn = ts;
       }
 
+      const targetEnemies = Math.min(4 + Math.floor(state.wave / 2), 20);
+      const enemySpawnEvery = Math.max(500, 2800 - state.wave * 80);
+      if (ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < targetEnemies) {
+        spawnEnemy();
+        state.lastEnemySpawn = ts;
+      }
+
+      if (ts - state.lastPickupSpawn > 6000) {
+        spawnPcPickup();
+        state.lastPickupSpawn = ts;
+      }
+
+      state.hp = Math.min(state.maxHp, state.hp + state.hpRegen);
+      if (state.totalFatEarned > state.wave * 120) {
+        state.wave += 1;
+        state.uiDirty = true;
+        setStatus(`Wave ${state.wave} started!`, "#93c5fd");
+      }
+
       updateRat();
       collectFood();
+      collectPickups();
+      updateEnemies();
       maybeAutoUnlockAndTravel();
 
       if (state.uiDirty) renderAll();
@@ -826,6 +1063,7 @@
     document.getElementById("openShopBtn").addEventListener("click", () => openModal("#shopModal"));
     document.getElementById("openZonesBtn").addEventListener("click", () => openModal("#zonesModal"));
     document.getElementById("openRatBtn").addEventListener("click", () => openModal("#ratModal"));
+    document.getElementById("openPcBtn").addEventListener("click", () => openModal("#pcModal"));
     document.getElementById("openModesBtn").addEventListener("click", () => openModal("#modesModal"));
     document.getElementById("openLeaderboardBtn").addEventListener("click", async () => {
       openModal("#leaderboardModal");
@@ -839,7 +1077,23 @@
     shopList.addEventListener("click", e => {
       const btn = e.target.closest("button[data-buy]");
       if (!btn) return;
-      buyItem(btn.dataset.buy);
+      const itemId = btn.dataset.buy;
+      let amount = Number(btn.dataset.amount || 1);
+      if (btn.dataset.amount === "custom") {
+        const input = shopList.querySelector(`input[data-qty="${itemId}"]`);
+        amount = Number(input?.value || 1);
+      }
+      buyItem(itemId, amount);
+    });
+
+    pcList.addEventListener("click", e => {
+      const buy = e.target.closest("button[data-pc-buy]");
+      if (buy) {
+        buyPcAccessory(buy.dataset.pcBuy);
+        return;
+      }
+      const equip = e.target.closest("button[data-pc-equip]");
+      if (equip) togglePcEquip(equip.dataset.pcEquip);
     });
 
     zonesList.addEventListener("click", e => {
