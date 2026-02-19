@@ -141,13 +141,58 @@
 
     .enemy {
       position: absolute;
-      width: 34px;
-      height: 34px;
-      font-size: 28px;
+      width: 44px;
+      height: 44px;
+      font-size: 30px;
       display: grid;
       place-items: center;
       filter: drop-shadow(0 6px 6px rgba(0,0,0,.35));
       pointer-events: none;
+    }
+
+    .enemy-hp {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: -10px;
+      width: 58px;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(15,23,42,.8);
+      border: 1px solid rgba(255,255,255,.25);
+      overflow: hidden;
+      display: none;
+    }
+
+    .enemy-hp-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg,#22c55e,#eab308,#ef4444);
+      transform-origin: left;
+    }
+
+    .boss-hp-wrap {
+      display: none;
+      margin-top: 4px;
+      border-radius: 12px;
+      padding: 8px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(15,23,42,.6);
+    }
+
+    .boss-hp-track {
+      width: 100%;
+      height: 14px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(15,23,42,.8);
+      border: 1px solid rgba(255,255,255,.3);
+    }
+
+    .boss-hp-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg,#f97316,#ef4444);
     }
 
     .pickup {
@@ -272,6 +317,10 @@
     </div>
     <div class="pill">Move with WASD / Arrow Keys • Survive waves</div>
     <div class="status" id="statusMsg"></div>
+    <div class="boss-hp-wrap" id="bossHpWrap">
+      <div id="bossHpLabel" style="font-weight:700;margin-bottom:4px">KING RAT 👑 1000/1000 HP</div>
+      <div class="boss-hp-track"><div class="boss-hp-fill" id="bossHpFill"></div></div>
+    </div>
   </header>
 
   <main id="gameArea" aria-label="Fat Rat Game Arena">
@@ -441,6 +490,7 @@
       pcOwned: {},
       pcEquipped: {},
       pcFatBonus: 0,
+      bossEnemyId: null,
       touch: { up: false, down: false, left: false, right: false },
       playerId: localStorage.getItem("fatRatPlayerId") || crypto.randomUUID(),
       remoteBoard: [],
@@ -461,6 +511,9 @@
     const hpStat = document.getElementById("hpStat");
     const waveStat = document.getElementById("waveStat");
     const statusMsg = document.getElementById("statusMsg");
+    const bossHpWrap = document.getElementById("bossHpWrap");
+    const bossHpFill = document.getElementById("bossHpFill");
+    const bossHpLabel = document.getElementById("bossHpLabel");
     const shopList = document.getElementById("shopList");
     const zonesList = document.getElementById("zonesList");
     const pcList = document.getElementById("pcList");
@@ -848,26 +901,80 @@
       }
     }
 
+
+    const enemyTypes = {
+      bandit: { name: "Rat Bandit", hp: 50, speed: 1.8, damage: 4, defense: 0, emoji: "🥷" },
+      shooter: { name: "Rat Shooter", hp: 150, speed: 1.1, damage: 5, defense: 10, range: 220, fireRate: 900, emoji: "🔫" },
+      fast: { name: "Fast Rat", hp: 25, speed: 3.6, damage: 3, defense: 0, emoji: "⚡" },
+      king: { name: "KING RAT 👑", hp: 1000, speed: 0.6, damage: 12, defense: 20, boss: true, emoji: "👑" }
+    };
+
+    function pickEnemyType() {
+      if (state.modeEnemyMultiplier > 1.45 && Math.random() < 0.18) return "king";
+      if (state.wave % 10 === 0 && !state.bossEnemyId) return "king";
+      const roll = Math.random();
+      if (roll < 0.5) return "bandit";
+      if (roll < 0.78) return "fast";
+      return "shooter";
+    }
+
+    function updateBossHud() {
+      const boss = state.enemies.find(e => e.id === state.bossEnemyId);
+      if (!boss) {
+        bossHpWrap.style.display = "none";
+        state.bossEnemyId = null;
+        return;
+      }
+      bossHpWrap.style.display = "block";
+      const ratio = Math.max(0, boss.hp / boss.maxHp);
+      bossHpFill.style.width = `${(ratio * 100).toFixed(1)}%`;
+      bossHpLabel.textContent = `KING RAT 👑 ${Math.max(0, Math.ceil(boss.hp))}/${boss.maxHp} HP`;
+    }
+
+    function damageEnemy(enemy, amount) {
+      const real = Math.max(1, amount - (enemy.defense || 0) * 0.05);
+      enemy.hp -= real;
+      enemy.wasDamaged = true;
+      const hpFill = document.querySelector(`#${enemy.id} .enemy-hp-fill`);
+      const hpWrap = document.querySelector(`#${enemy.id} .enemy-hp`);
+      if (hpFill && hpWrap) {
+        hpWrap.style.display = "block";
+        const ratio = Math.max(0, enemy.hp / enemy.maxHp);
+        hpFill.style.width = `${(ratio * 100).toFixed(1)}%`;
+      }
+    }
+
     function spawnEnemy() {
-      const bossWave = state.wave % 5 === 0;
+      const typeId = pickEnemyType();
+      const type = enemyTypes[typeId];
       const enemy = {
         id: `enemy-${Math.random().toString(36).slice(2)}`,
-        x: Math.random() * Math.max(20, gameArea.clientWidth - 36),
-        y: Math.random() * Math.max(20, gameArea.clientHeight - 36),
-        speed: (bossWave ? 1.2 : 1.7) * state.modeEnemyMultiplier,
-        hp: bossWave ? 16 + state.wave * 2 : 5 + state.wave,
-        damage: bossWave ? 8 + Math.floor(state.wave / 2) : 3 + Math.floor(state.wave / 4),
-        boss: bossWave,
-        emoji: bossWave ? "👹" : "🪳"
+        type: typeId,
+        x: Math.random() * Math.max(20, gameArea.clientWidth - 46),
+        y: Math.random() * Math.max(20, gameArea.clientHeight - 46),
+        speed: type.speed * state.modeEnemyMultiplier,
+        hp: type.hp,
+        maxHp: type.hp,
+        damage: type.damage,
+        defense: type.defense || 0,
+        range: type.range || 0,
+        fireRate: type.fireRate || 0,
+        lastShot: 0,
+        boss: !!type.boss,
+        wasDamaged: false,
+        name: type.name,
+        emoji: type.emoji
       };
+      if (enemy.boss) state.bossEnemyId = enemy.id;
       state.enemies.push(enemy);
       const el = document.createElement("div");
       el.id = enemy.id;
       el.className = "enemy";
       el.style.left = `${enemy.x}px`;
       el.style.top = `${enemy.y}px`;
-      el.textContent = enemy.emoji;
+      el.innerHTML = `<div class="enemy-hp"><div class="enemy-hp-fill"></div></div><span>${enemy.emoji}</span>`;
       gameArea.appendChild(el);
+      updateBossHud();
     }
 
     function spawnPcPickup() {
@@ -957,15 +1064,24 @@
       }
     }
 
-    function updateEnemies() {
+    function updateEnemies(ts) {
       const ratCenterX = state.rat.x + state.rat.w / 2;
       const ratCenterY = state.rat.y + state.rat.h / 2;
       state.enemies.forEach(enemy => {
         const dx = ratCenterX - enemy.x;
         const dy = ratCenterY - enemy.y;
         const dist = Math.hypot(dx, dy) || 1;
-        enemy.x += (dx / dist) * enemy.speed;
-        enemy.y += (dy / dist) * enemy.speed;
+
+        if (enemy.type === "shooter" && dist < enemy.range) {
+          if (ts - enemy.lastShot > enemy.fireRate) {
+            state.hp -= enemy.damage * 0.7;
+            enemy.lastShot = ts;
+          }
+        } else {
+          enemy.x += (dx / dist) * enemy.speed;
+          enemy.y += (dy / dist) * enemy.speed;
+        }
+
         const enemyEl = document.getElementById(enemy.id);
         if (enemyEl) {
           enemyEl.style.left = `${enemy.x}px`;
@@ -975,21 +1091,25 @@
 
       const ratBox = { x: state.rat.x, y: state.rat.y, w: state.rat.w, h: state.rat.h };
       state.enemies = state.enemies.filter(enemy => {
-        const enemyBox = { x: enemy.x, y: enemy.y, w: enemy.boss ? 40 : 30, h: enemy.boss ? 40 : 30 };
+        const enemyBox = { x: enemy.x, y: enemy.y, w: enemy.boss ? 46 : 34, h: enemy.boss ? 46 : 34 };
         if (intersects(ratBox, enemyBox)) {
-          state.hp -= enemy.damage * 0.03;
-          enemy.hp -= state.damage * 0.08;
+          state.hp -= enemy.damage * 0.04;
+          damageEnemy(enemy, state.damage * 0.65);
         }
         if (enemy.hp <= 0) {
-          state.coins += enemy.boss ? 30 : 8;
-          state.totalFatEarned += enemy.boss ? 12 : 4;
+          state.coins += enemy.boss ? 120 : enemy.type === "shooter" ? 18 : 10;
+          state.totalFatEarned += enemy.boss ? 80 : enemy.type === "shooter" ? 8 : 5;
           document.getElementById(enemy.id)?.remove();
+          if (enemy.boss) {
+            setStatus("KING RAT defeated! 👑", "#fde68a");
+          }
           state.uiDirty = true;
           return false;
         }
         return true;
       });
 
+      updateBossHud();
       if (state.hp <= 0) {
         state.hp = state.maxHp;
         state.wave = Math.max(1, state.wave - 1);
@@ -1051,7 +1171,7 @@
       updateRat();
       collectFood();
       collectPickups();
-      updateEnemies();
+      updateEnemies(ts);
       maybeAutoUnlockAndTravel();
 
       if (state.uiDirty) renderAll();
