@@ -432,6 +432,7 @@
       <div class="pill">❤️ HP <span id="hpStat">100</span></div>
       <div class="pill">🌊 Wave <span id="waveStat">1</span></div>
       <div class="pill">🐣 Helpers <span id="helperStat">0</span></div>
+      <div class="pill">💀 Deaths <span id="deathStat">0</span></div>
     </div>
     <div class="button-row">
       <button class="ios-btn" id="openShopBtn">Boosts</button>
@@ -440,6 +441,7 @@
       <button class="ios-btn secondary" id="openPcBtn">PC Accessories</button>
       <button class="ios-btn secondary" id="openLeaderboardBtn">World Leaderboard</button>
       <button class="ios-btn" id="openModesBtn">Game Modes</button>
+      <button class="ios-btn secondary" id="openDebugBtn">Debug</button>
     </div>
     <div class="pill">Move with WASD / Arrow Keys • Survive waves</div>
     <div class="status" id="statusMsg"></div>
@@ -519,6 +521,30 @@
       </div>
       <div class="card" style="margin-top:10px">
         <div id="leaderboardList"></div>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="modal" id="debugModal">
+    <div class="sheet">
+      <div class="row"><h2>🛠️ Debug Panel</h2><button class="ios-btn secondary" data-close="#debugModal">Close</button></div>
+      <div class="card">
+        <div style="color:var(--muted);margin-bottom:8px">Enter password to unlock debug tools.</div>
+        <div class="row">
+          <input id="debugPasswordInput" type="password" placeholder="Password" />
+          <button class="ios-btn" id="unlockDebugBtn">Unlock</button>
+        </div>
+      </div>
+      <div class="card" id="debugTools" style="margin-top:10px;display:none">
+        <div style="font-weight:700;margin-bottom:8px">Debug Tools (Unlocked)</div>
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          <button class="ios-btn" data-debug="infMoney">Give Inf Money</button>
+          <button class="ios-btn" data-debug="noCap">Toggle No Cap</button>
+          <button class="ios-btn" data-debug="megaBoost">Give Mega Boosts</button>
+          <button class="ios-btn" data-debug="heal">Full Heal</button>
+          <button class="ios-btn" data-debug="nextWave">Skip +1 Wave</button>
+        </div>
       </div>
     </div>
   </div>
@@ -657,6 +683,9 @@
       vulnUntil: 0,
       playerDefensePierce: 0,
       waveCapAmplifier: 0,
+      deaths: 0,
+      debugUnlocked: false,
+      debugNoCap: false,
       bossMilestoneSpawned: {},
       lunaticSpawned: false,
       pylons: [],
@@ -681,6 +710,7 @@
     const hpStat = document.getElementById("hpStat");
     const waveStat = document.getElementById("waveStat");
     const helperStat = document.getElementById("helperStat");
+    const deathStat = document.getElementById("deathStat");
     const statusMsg = document.getElementById("statusMsg");
     const bossHpWrap = document.getElementById("bossHpWrap");
     const bossHpFill = document.getElementById("bossHpFill");
@@ -693,6 +723,7 @@
     const myRankText = document.getElementById("myRankText");
     const wavePopup = document.getElementById("wavePopup");
     const helperRarityList = document.getElementById("helperRarityList");
+    const debugTools = document.getElementById("debugTools");
     localStorage.setItem("fatRatPlayerId", state.playerId);
 
     function currentZone() { return zones[state.zoneIndex]; }
@@ -749,6 +780,7 @@
       hpStat.textContent = `${Math.round(state.hp)}/${Math.round(getPlayerMaxHp())}${Date.now() < state.regenBlockedUntil ? " 🚫Regen" : ""}${Date.now() < state.slowedUntil ? " 🧊Slow" : ""}`;
       waveStat.textContent = state.wave;
       helperStat.textContent = state.helperCount;
+      deathStat.textContent = state.deaths;
       gameArea.style.background = currentZone().bg;
 
       const burnerGrowthMul = state.ultraShrinkerActive ? 0 : Math.max(0.28, 1 - state.fatBurnerLevel * 0.07);
@@ -791,6 +823,7 @@
 
 
     function getBoostMax(item) {
+      if (state.debugNoCap) return Number.MAX_SAFE_INTEGER;
       if (item.id === "speed") return item.max;
       if (item.id === "mult") return item.max;
       const waveTier = Math.floor(state.wave / 10);
@@ -1689,6 +1722,7 @@
         state.combo = 1;
         state.enemyBullets.forEach(b => document.getElementById(b.id)?.remove());
         state.enemyBullets = [];
+        state.deaths += 1;
         setStatus("You got bonked! Respawned with HP reset.", "#fca5a5");
       }
     }
@@ -1860,6 +1894,52 @@
     document.getElementById("openRatBtn").addEventListener("click", () => openModal("#ratModal"));
     document.getElementById("openPcBtn").addEventListener("click", () => openModal("#pcModal"));
     document.getElementById("openModesBtn").addEventListener("click", () => openModal("#modesModal"));
+    document.getElementById("openDebugBtn").addEventListener("click", () => openModal("#debugModal"));
+
+    document.getElementById("unlockDebugBtn").addEventListener("click", () => {
+      const pass = document.getElementById("debugPasswordInput").value.trim();
+      if (pass !== "rustygooners") {
+        setStatus("Wrong debug password.", "#fca5a5");
+        return;
+      }
+      state.debugUnlocked = true;
+      debugTools.style.display = "block";
+      setStatus("Debug tools unlocked.", "#86efac");
+    });
+
+    debugTools.addEventListener("click", e => {
+      const btn = e.target.closest("button[data-debug]");
+      if (!btn || !state.debugUnlocked) return;
+      const action = btn.dataset.debug;
+      if (action === "infMoney") {
+        state.coins = 999999999;
+        setStatus("Infinite money granted.", "#86efac");
+      } else if (action === "noCap") {
+        state.debugNoCap = !state.debugNoCap;
+        setStatus(`No cap mode: ${state.debugNoCap ? "ON" : "OFF"}`, "#93c5fd");
+      } else if (action === "megaBoost") {
+        const skip = new Set(["ultraburn"]);
+        shopItems.forEach(item => {
+          if (skip.has(item.id)) return;
+          const count = item.id === "helper" ? 5 : 8;
+          for (let i = 0; i < count; i++) item.apply(state);
+          state.boostPurchases[item.id] = (state.boostPurchases[item.id] || 0) + count;
+        });
+        setStatus("Mega boosts granted.", "#86efac");
+      } else if (action === "heal") {
+        state.hp = getPlayerMaxHp();
+        setStatus("HP fully restored.", "#86efac");
+      } else if (action === "nextWave") {
+        state.wave += 1;
+        state.enemies.forEach(en => document.getElementById(en.id)?.remove());
+        state.enemyBullets.forEach(b => document.getElementById(b.id)?.remove());
+        state.enemies = [];
+        state.enemyBullets = [];
+        startWave(state.wave);
+        setStatus(`Skipped to wave ${state.wave}.`, "#93c5fd");
+      }
+      state.uiDirty = true;
+    });
     document.getElementById("openLeaderboardBtn").addEventListener("click", async () => {
       openModal("#leaderboardModal");
       await refreshLeaderboardFromApi();
