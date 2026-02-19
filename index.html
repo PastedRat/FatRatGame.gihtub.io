@@ -509,10 +509,11 @@
     ];
 
     const shopItems = [
-      { id: "speed", name: "Rocket Sneakers", cost: 12, max: 15, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
-      { id: "mult", name: "Grease Booster", cost: 20, max: 20, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
+      { id: "speed", name: "Rocket Sneakers", cost: 12, max: 10, desc: "+0.9 movement speed", apply: s => s.speed += 0.9 },
+      { id: "mult", name: "Grease Booster", cost: 20, max: 35, desc: "+1 fat per bite", apply: s => s.fatPerFood += 1 },
+      { id: "burner", name: "Fat Burner", cost: 52, max: 12, desc: "Slows rat growth and shrinks current fat", apply: s => { s.fatBurnerLevel += 1; s.fat = Math.max(0, Math.floor(s.fat * 0.92)); } },
       { id: "spawn", name: "Snack Magnet", cost: 28, max: 10, desc: "Faster food spawns", apply: s => s.spawnBoost += 160 },
-      { id: "coin", name: "Golden Whiskers", cost: 25, max: 15, desc: "+1 coin per food", apply: s => s.coinBoost += 1 },
+      { id: "coin", name: "Golden Whiskers", cost: 25, max: 10, desc: "+1 coin per food", apply: s => s.coinBoost += 1 },
       { id: "armor", name: "Cheese Armor", cost: 34, max: 18, desc: "+10 max HP", apply: s => { s.maxHp += 10; s.hp = Math.min(s.maxHp, s.hp + 8); } },
       { id: "regen", name: "Regeneration Soda", cost: 45, max: 18, desc: "+0.12 HP regen", apply: s => s.hpRegen += 0.12 },
       { id: "damage", name: "Spicy Bite", cost: 38, max: 20, desc: "+1 rat damage", apply: s => s.damage += 1 },
@@ -589,6 +590,9 @@
       boostPurchases: {},
       hitboxBonus: 0,
       wave: 1,
+      waveSpawnLeft: 0,
+      waveSpawnTick: 0,
+      waveStarted: false,
       enemies: [],
       enemyBullets: [],
       pickups: [],
@@ -599,6 +603,9 @@
       pcFatBonus: 0,
       bossEnemyId: null,
       wave20BossSpawned: false,
+      wave30BossSpawned: false,
+      wave40BossSpawned: false,
+      fatBurnerLevel: 0,
       regenBlockedUntil: 0,
       slowedUntil: 0,
       vulnUntil: 0,
@@ -692,11 +699,12 @@
       helperStat.textContent = state.helperCount;
       gameArea.style.background = currentZone().bg;
 
-      const visualScale = Math.min(1 + state.fat * 0.016, 3.4);
+      const burnerGrowthMul = Math.max(0.28, 1 - state.fatBurnerLevel * 0.07);
+      const visualScale = Math.min(1 + state.fat * 0.016 * burnerGrowthMul, 3.4);
       ratEl.style.transform = `scale(${visualScale})`;
 
       // Bigger fat = bigger collection hitbox
-      const hitboxScale = Math.min(1 + state.fat * 0.01, 3.2);
+      const hitboxScale = Math.min(1 + state.fat * 0.01 * burnerGrowthMul, 3.2);
       const pcHitboxBonus = state.pcEquipped.keyboard ? 8 : 0;
       state.rat.w = 64 * hitboxScale + state.hitboxBonus + pcHitboxBonus;
       state.rat.h = 48 * hitboxScale + state.hitboxBonus + pcHitboxBonus;
@@ -729,14 +737,21 @@
         helperRarityTable.map(h => `<div style="margin-top:6px">${h.icon} <strong>${h.type}</strong> • ${h.rarity} • ${h.chance}% • ATK ${h.attack} • ${h.style === "ranged" ? `Range ${h.range}` : `Melee ${h.range}px`} • Owned: ${counts[h.rarity] || 0}</div>`).join("");
     }
 
+
+    function getBoostMax(item) {
+      if (["speed", "coin", "mult"].includes(item.id)) return item.max;
+      return item.max + Math.floor(state.wave / 3);
+    }
+
     function renderShop() {
       shopList.innerHTML = "";
       shopItems.forEach(item => {
         const card = document.createElement("div");
         card.className = "card";
         const bought = state.boostPurchases[item.id] || 0;
-        const atCap = item.max && bought >= item.max;
-        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins each • ${bought}/${item.max || "∞"}</div></div><div><input class="small-input" type="number" min="1" value="1" data-qty="${item.id}" /><button class="ios-btn" data-buy="${item.id}" data-amount="1" ${(state.coins >= item.cost && !atCap) ? "" : "disabled"}>Buy 1</button><button class="ios-btn secondary" data-buy="${item.id}" data-amount="custom" ${atCap ? "disabled" : ""}>Buy x</button></div></div>`;
+        const itemMax = getBoostMax(item);
+        const atCap = itemMax && bought >= itemMax;
+        card.innerHTML = `<div class="row"><div><strong>${item.name}</strong><div>${item.desc}</div><div>${item.cost} coins each • ${bought}/${itemMax || "∞"}</div></div><div><input class="small-input" type="number" min="1" value="1" data-qty="${item.id}" /><button class="ios-btn" data-buy="${item.id}" data-amount="1" ${(state.coins >= item.cost && !atCap) ? "" : "disabled"}>Buy 1</button><button class="ios-btn secondary" data-buy="${item.id}" data-amount="custom" ${atCap ? "disabled" : ""}>Buy x</button></div></div>`;
         shopList.appendChild(card);
       });
     }
@@ -1040,7 +1055,8 @@
         return;
       }
       const already = state.boostPurchases[id] || 0;
-      const allowed = item.max ? Math.max(0, item.max - already) : count;
+      const itemMax = getBoostMax(item);
+      const allowed = itemMax ? Math.max(0, itemMax - already) : count;
       if (allowed <= 0) {
         setStatus(`${item.name} is already maxed!`, "#fca5a5");
         return;
@@ -1109,20 +1125,43 @@
       assassin: { name: "Assassin Rat", hp: 420, speed: 4.6, damage: 18, defense: 20, defensePierce: 12, debuff: "slow", badge: "🩸", primary: "#c4b5fd", secondary: "#4c1d95" },
       juggernaut: { name: "Juggernaut Rat", hp: 2400, speed: 0.95, damage: 30, defense: 65, defensePierce: 20, debuff: "noregen", badge: "🛡️", primary: "#fdba74", secondary: "#7c2d12" },
       void: { name: "Void Rat", hp: 1800, speed: 2.5, damage: 25, defense: 40, range: 280, fireRate: 520, defensePierce: 18, debuff: "vuln", badge: "🕳️", primary: "#93c5fd", secondary: "#1e3a8a" },
-      apex: { name: "APEX TITAN RAT ☠️", hp: 50000, speed: 1.2, damage: 65, defense: 300, boss: true, range: 360, fireRate: 420, defensePierce: 180, debuff: "noregen", ultraRate: 6000, badge: "☠️", primary: "#fecaca", secondary: "#7f1d1d" }
+      apex: { name: "APEX TITAN RAT ☠️", hp: 50000, speed: 1.2, damage: 65, defense: 300, boss: true, range: 360, fireRate: 420, defensePierce: 180, debuff: "noregen", ultraRate: 6000, badge: "☠️", primary: "#fecaca", secondary: "#7f1d1d" },
+      plague: { name: "Plague Rat", hp: 3200, speed: 2.1, damage: 38, defense: 90, range: 300, fireRate: 620, defensePierce: 26, debuff: "noregen", badge: "☣️", primary: "#86efac", secondary: "#166534" },
+      railgun: { name: "Railgun Rat", hp: 4600, speed: 1.5, damage: 44, defense: 110, range: 360, fireRate: 780, defensePierce: 45, debuff: "vuln", badge: "🚄", primary: "#bfdbfe", secondary: "#1d4ed8" },
+      fishron: { name: "DUKE RATRON 🦈", hp: 98000, speed: 2.2, damage: 95, defense: 420, boss: true, range: 420, fireRate: 340, defensePierce: 220, debuff: "slow", ultraRate: 5200, badge: "🦈", primary: "#67e8f9", secondary: "#0e7490" },
+      empress: { name: "EMPRESS OF LIGHT RAT ✨", hp: 145000, speed: 2.5, damage: 120, defense: 520, boss: true, range: 460, fireRate: 300, defensePierce: 280, debuff: "vuln", ultraRate: 4600, badge: "✨", primary: "#fbcfe8", secondary: "#a21caf" }
     };
 
     function pickEnemyType() {
+      if (state.wave >= 40 && !state.wave40BossSpawned) return "empress";
+      if (state.wave >= 30 && !state.wave30BossSpawned) return "fishron";
       if (state.wave >= 20 && !state.wave20BossSpawned) return "apex";
       if (state.modeEnemyMultiplier > 1.45 && Math.random() < 0.18) return "king";
       if (state.wave % 10 === 0 && !state.bossEnemyId && state.wave < 20) return "king";
       const roll = Math.random();
+      if (state.wave >= 40) {
+        if (roll < 0.2) return "empress";
+        if (roll < 0.36) return "fishron";
+        if (roll < 0.52) return "railgun";
+        if (roll < 0.68) return "void";
+        if (roll < 0.84) return "juggernaut";
+        return "assassin";
+      }
+      if (state.wave >= 30) {
+        if (roll < 0.24) return "fishron";
+        if (roll < 0.42) return "railgun";
+        if (roll < 0.58) return "plague";
+        if (roll < 0.74) return "void";
+        if (roll < 0.88) return "juggernaut";
+        return "assassin";
+      }
       if (state.wave >= 20) {
-        if (roll < 0.18) return "void";
-        if (roll < 0.35) return "juggernaut";
-        if (roll < 0.55) return "assassin";
-        if (roll < 0.72) return "pyro";
-        if (roll < 0.86) return "shooter";
+        if (roll < 0.15) return "void";
+        if (roll < 0.28) return "juggernaut";
+        if (roll < 0.42) return "plague";
+        if (roll < 0.56) return "railgun";
+        if (roll < 0.7) return "assassin";
+        if (roll < 0.84) return "pyro";
         return "shadow";
       }
       if (state.wave >= 15) {
@@ -1200,6 +1239,8 @@
       };
       if (enemy.boss) state.bossEnemyId = enemy.id;
       if (enemy.type === "apex") state.wave20BossSpawned = true;
+      if (enemy.type === "fishron") state.wave30BossSpawned = true;
+      if (enemy.type === "empress") state.wave40BossSpawned = true;
       state.enemies.push(enemy);
       const el = document.createElement("div");
       el.id = enemy.id;
@@ -1394,15 +1435,32 @@
             enemy.lastShot = ts;
           }
           if (enemy.ultraRate && ts - enemy.lastUltra > enemy.ultraRate) {
-            for (let i = 0; i < 14; i++) {
-              const angle = (Math.PI * 2 * i) / 14;
-              const targetX = enemy.x + Math.cos(angle) * 130;
-              const targetY = enemy.y + Math.sin(angle) * 130;
-              spawnEnemyBullet(enemy, targetX, targetY, { speed: 6.5, damage: enemy.damage * 1.8, size: 22, life: 2600, defensePierce: (enemy.defensePierce || 0) + 60, debuff: "noregen" });
+            if (enemy.type === "fishron") {
+              for (let i = 0; i < 3; i++) {
+                spawnEnemyBullet(enemy, ratCenterX + (i - 1) * 80, ratCenterY, { speed: 8.2, damage: enemy.damage * 1.2, size: 18, life: 1500, debuff: "slow" });
+              }
+              enemy.x += (dx / dist) * 120;
+              enemy.y += (dy / dist) * 120;
+              showWavePopup("🦈 DUKE RATRON dash assault!");
+            } else if (enemy.type === "empress") {
+              for (let i = 0; i < 18; i++) {
+                const angle = (Math.PI * 2 * i) / 18 + (ts / 600);
+                const targetX = enemy.x + Math.cos(angle) * 220;
+                const targetY = enemy.y + Math.sin(angle) * 220;
+                spawnEnemyBullet(enemy, targetX, targetY, { speed: 5.4, damage: enemy.damage * 1.05, size: 26, life: 3200, debuff: "vuln" });
+              }
+              showWavePopup("✨ EMPRESS OF LIGHT RAT prism barrage!");
+            } else {
+              for (let i = 0; i < 14; i++) {
+                const angle = (Math.PI * 2 * i) / 14;
+                const targetX = enemy.x + Math.cos(angle) * 130;
+                const targetY = enemy.y + Math.sin(angle) * 130;
+                spawnEnemyBullet(enemy, targetX, targetY, { speed: 6.5, damage: enemy.damage * 1.8, size: 22, life: 2600, defensePierce: (enemy.defensePierce || 0) + 60, debuff: "noregen" });
+              }
+              if (dist < 240) dealDamageToPlayer(enemy, enemy.damage * 1.4);
+              showWavePopup("⚠️ APEX TITAN RAT used ULTRA ATTACK!");
             }
-            if (dist < 240) dealDamageToPlayer(enemy, enemy.damage * 1.4);
             enemy.lastUltra = ts;
-            showWavePopup("⚠️ APEX TITAN RAT used ULTRA ATTACK!");
           }
         } else {
           enemy.x += (dx / dist) * enemy.speed;
@@ -1529,6 +1587,31 @@
       state.uiDirty = false;
     }
 
+
+    function startWave(wave) {
+      state.waveStarted = true;
+      const baseCount = 4 + wave * 2;
+      state.waveSpawnLeft = wave >= 20 ? baseCount + 10 : wave >= 15 ? baseCount + 6 : wave >= 10 ? baseCount + 3 : baseCount;
+      state.waveSpawnTick = 0;
+      if (wave === 40) {
+        showWavePopup("WAVE 40 started... EMPRESS OF LIGHT RAT descended!");
+        setStatus("Final nightmare: huge but dodgeable light attacks!", "#f9a8d4");
+      } else if (wave === 30) {
+        showWavePopup("WAVE 30 started... DUKE RATRON rises from the sewers!");
+        setStatus("Boss fight: shark-like dash attacks incoming!", "#67e8f9");
+      } else if (wave === 20) {
+        showWavePopup("WAVE 20 started... APEX TITAN RAT awakened!");
+        setStatus("Final boss incoming: 50,000 HP / 300 DEF", "#fca5a5");
+      } else if (wave === 10) {
+        showWavePopup("WAVE 10 started... new enemies added.");
+        setStatus("Hard mode enemies unlocked!", "#fca5a5");
+      } else {
+        showWavePopup(`WAVE ${wave} started!`);
+        setStatus(`Wave ${wave} started!`, "#93c5fd");
+      }
+      state.uiDirty = true;
+    }
+
     function gameLoop(ts) {
       const dt = Math.min(50, ts - (state.lastFrameTs || ts));
       state.lastFrameTs = ts;
@@ -1538,10 +1621,11 @@
         state.lastSpawn = ts;
       }
 
-      const targetEnemies = Math.min(4 + Math.floor(state.wave / 2), 20);
-      const enemySpawnEvery = Math.max(500, 2800 - state.wave * 80);
-      if (ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < targetEnemies) {
+      const maxAlive = Math.min(6 + Math.floor(state.wave * 0.85), 36);
+      const enemySpawnEvery = Math.max(300, 1600 - state.wave * 22);
+      if (state.waveSpawnLeft > 0 && ts - state.lastEnemySpawn > enemySpawnEvery && state.enemies.length < maxAlive) {
         spawnEnemy();
+        state.waveSpawnLeft -= 1;
         state.lastEnemySpawn = ts;
       }
 
@@ -1552,19 +1636,11 @@
 
       const regenRate = Date.now() < state.regenBlockedUntil ? 0 : getPlayerHpRegen();
       state.hp = Math.min(getPlayerMaxHp(), state.hp + regenRate);
-      if (state.totalFatEarned > state.wave * 120) {
+      if (!state.waveStarted) {
+        startWave(state.wave);
+      } else if (state.waveSpawnLeft <= 0 && state.enemies.length === 0) {
         state.wave += 1;
-        state.uiDirty = true;
-        if (state.wave === 20) {
-          showWavePopup("WAVE 20 started... APEX TITAN RAT awakened!");
-          setStatus("Final boss incoming: 50,000 HP / 300 DEF", "#fca5a5");
-        } else if (state.wave === 10) {
-          showWavePopup("WAVE 10 started... new enemies added.");
-          setStatus("Hard mode enemies unlocked!", "#fca5a5");
-        } else {
-          showWavePopup(`WAVE ${state.wave} started!`);
-          setStatus(`Wave ${state.wave} started!`, "#93c5fd");
-        }
+        startWave(state.wave);
       }
 
       updateRat();
